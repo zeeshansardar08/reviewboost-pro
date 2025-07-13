@@ -33,6 +33,8 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_pro_sms_from', [ 'sanitize_callback' => 'sanitize_text_field' ] );
 		// Multi-step reminders (Pro)
 		register_setting( 'rbp_settings', 'rbp_pro_multistep_reminders', [ 'sanitize_callback' => [ $this, 'sanitize_multistep_reminders' ] ] );
+		// Advanced Template Builder (Pro)
+		register_setting( 'rbp_settings', 'rbp_pro_templates', [ 'sanitize_callback' => [ $this, 'sanitize_templates' ] ] );
 	}
 
 	/**
@@ -47,6 +49,23 @@ class RBP_Admin {
 				'channel' => sanitize_text_field( $step['channel'] ?? '' ),
 				'subject' => sanitize_text_field( $step['subject'] ?? '' ),
 				'body'    => wp_kses_post( $step['body'] ?? '' ),
+			];
+		}
+		return $sanitized;
+	}
+
+	/**
+	 * Sanitize templates array
+	 */
+	public function sanitize_templates( $input ) {
+		if ( ! is_array( $input ) ) return [];
+		$sanitized = [];
+		foreach ( $input as $type => $tpl ) {
+			$sanitized[ $type ] = [
+				'header' => wp_kses_post( $tpl['header'] ?? '' ),
+				'body'   => wp_kses_post( $tpl['body'] ?? '' ),
+				'footer' => wp_kses_post( $tpl['footer'] ?? '' ),
+				'button' => wp_kses_post( $tpl['button'] ?? '' ),
 			];
 		}
 		return $sanitized;
@@ -174,6 +193,53 @@ class RBP_Admin {
 					</tr>
 					<!-- End Multi-step Reminders -->
 				</table>
+				<h2><?php esc_html_e( 'Advanced Template Builder (Pro)', 'reviewboost-pro' ); ?></h2>
+				<div id="rbp-template-builder">
+					<ul class="rbp-template-tabs">
+						<li class="active"><a href="#rbp-tpl-email">Email</a></li>
+						<li><a href="#rbp-tpl-whatsapp">WhatsApp</a></li>
+						<li><a href="#rbp-tpl-sms">SMS</a></li>
+					</ul>
+					<div class="rbp-template-tab-content" id="rbp-tpl-email">
+						<?php $tpl = get_option('rbp_pro_templates', []); $email = $tpl['email'] ?? ['header'=>'','body'=>'','footer'=>'','button'=>'']; ?>
+						<h4><?php esc_html_e('Email Template', 'reviewboost-pro'); ?></h4>
+						<label><?php esc_html_e('Header:', 'reviewboost-pro'); ?></label>
+						<?php wp_editor( $email['header'], 'rbp_pro_templates_email_header', [ 'textarea_name' => 'rbp_pro_templates[email][header]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
+						<label><?php esc_html_e('Body:', 'reviewboost-pro'); ?></label>
+						<?php wp_editor( $email['body'], 'rbp_pro_templates_email_body', [ 'textarea_name' => 'rbp_pro_templates[email][body]', 'media_buttons' => false, 'textarea_rows' => 6 ] ); ?>
+						<label><?php esc_html_e('Button (HTML allowed):', 'reviewboost-pro'); ?></label>
+						<input type="text" name="rbp_pro_templates[email][button]" value="<?php echo esc_attr($email['button']); ?>" class="regular-text" />
+						<label><?php esc_html_e('Footer:', 'reviewboost-pro'); ?></label>
+						<?php wp_editor( $email['footer'], 'rbp_pro_templates_email_footer', [ 'textarea_name' => 'rbp_pro_templates[email][footer]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
+						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[product_list]</code> <code>[review_url]</code></p>
+						<!-- TODO: Add live preview, emoji picker, and drag/drop sections -->
+					</div>
+					<div class="rbp-template-tab-content" id="rbp-tpl-whatsapp" style="display:none;">
+						<?php $wa = $tpl['whatsapp'] ?? ['body'=>'']; ?>
+						<h4><?php esc_html_e('WhatsApp Template', 'reviewboost-pro'); ?></h4>
+						<textarea name="rbp_pro_templates[whatsapp][body]" rows="4" cols="80"><?php echo esc_textarea($wa['body']); ?></textarea>
+						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
+						<!-- TODO: Add emoji picker -->
+					</div>
+					<div class="rbp-template-tab-content" id="rbp-tpl-sms" style="display:none;">
+						<?php $sms = $tpl['sms'] ?? ['body'=>'']; ?>
+						<h4><?php esc_html_e('SMS Template', 'reviewboost-pro'); ?></h4>
+						<textarea name="rbp_pro_templates[sms][body]" rows="3" cols="80"><?php echo esc_textarea($sms['body']); ?></textarea>
+						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
+						<!-- TODO: Add emoji picker -->
+					</div>
+					<script type="text/javascript">
+					jQuery(document).ready(function($){
+						$('.rbp-template-tabs a').click(function(e){
+							e.preventDefault();
+							$('.rbp-template-tabs li').removeClass('active');
+							$(this).parent().addClass('active');
+							$('.rbp-template-tab-content').hide();
+							$($(this).attr('href')).show();
+						});
+					});
+					</script>
+				</div>
 				<?php submit_button(); ?>
 			</form>
 
