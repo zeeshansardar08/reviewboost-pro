@@ -426,20 +426,6 @@ class RBP_Admin {
 	}
 
 	/**
-	 * Add Pro Logs Dashboard menu
-	 */
-	public function add_logs_dashboard_menu() {
-		add_submenu_page(
-			'woocommerce',
-			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
-			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
-			'manage_woocommerce',
-			'rbp-pro-logs',
-			[ $this, 'render_logs_dashboard' ]
-		);
-	}
-
-	/**
 	 * Render the Pro Logs Dashboard page
 	 */
 	public function render_logs_dashboard() {
