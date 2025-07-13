@@ -1,0 +1,142 @@
+/* ReviewBoost Pro Admin Styles */
+
+/* Brand colors */
+:root {
+    --rbp-primary: #7f54b3;
+    --rbp-accent: #f9f6ff;
+    --rbp-gradient: linear-gradient(90deg, #7f54b3 0%, #5b8dee 100%);
+    --rbp-success: #27ae60;
+    --rbp-warning: #f39c12;
+    --rbp-danger: #e74c3c;
+  }
+  
+  .rbp-getting-started {
+    background: var(--rbp-accent);
+    border-radius: 18px;
+    box-shadow: 0 6px 32px rgba(127,84,179,0.06);
+    padding: 36px 32px 32px 32px;
+    margin-top: 24px;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  }
+  
+  .rbp-getting-started h1 {
+    font-size: 2.2em;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 18px;
+    background: var(--rbp-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .rbp-getting-started ol {
+    margin: 28px 0 0 20px;
+    padding: 0;
+  }
+  
+  .rbp-getting-started li {
+    margin-bottom: 18px;
+    font-size: 1.1em;
+  }
+  
+  .rbp-getting-started .button-primary.button-hero {
+    background: var(--rbp-gradient);
+    border: none;
+    box-shadow: 0 2px 12px rgba(127,84,179,0.13);
+    font-size: 1.15em;
+    padding: 16px 32px;
+    border-radius: 8px;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .rbp-getting-started .button-primary.button-hero:hover {
+    background: linear-gradient(90deg, #5b8dee 0%, #7f54b3 100%);
+    box-shadow: 0 4px 18px rgba(127,84,179,0.18);
+  }
+  
+  .rbp-pro-upsell-banner, .rbp-pro-locked-notice {
+    border-radius: 10px;
+    border: 2px solid var(--rbp-primary);
+    background: var(--rbp-accent);
+    color: #333;
+    margin: 18px 0 24px 0;
+    padding: 22px 18px 22px 60px;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(127,84,179,0.08);
+    font-size: 1.08em;
+  }
+  
+  .rbp-pro-upsell-banner .button-primary,
+  .rbp-pro-locked-notice .button-primary {
+    background: var(--rbp-gradient);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 10px 26px;
+    margin-top: 10px;
+    transition: background 0.2s;
+  }
+  
+  .rbp-pro-upsell-banner .button-primary:hover,
+  .rbp-pro-locked-notice .button-primary:hover {
+    background: linear-gradient(90deg, #5b8dee 0%, #7f54b3 100%);
+  }
+  
+  .rbp-pro-upsell-banner .dashicons,
+  .rbp-pro-locked-notice .dashicons {
+    font-size: 28px;
+    color: var(--rbp-primary);
+    position: absolute;
+    left: 18px;
+    top: 22px;
+  }
+  
+  .form-table th,
+  .form-table td {
+    font-size: 1.07em;
+    padding: 12px 10px;
+  }
+  
+  .form-table input[type=\"text\"],
+  .form-table input[type=\"number\"],
+  .form-table textarea {
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    padding: 8px 12px;
+    font-size: 1em;
+    width: 100%;
+    max-width: 450px;
+    background: #fff;
+    transition: border 0.2s;
+  }
+  .form-table input:focus,
+  .form-table textarea:focus {
+    border-color: var(--rbp-primary);
+    outline: none;
+  }
+  
+  .form-table .button-primary {
+    background: var(--rbp-gradient);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 10px 22px;
+    margin-top: 10px;
+    transition: background 0.2s;
+  }
+  
+  .form-table .button-primary:hover {
+    background: linear-gradient(90deg, #5b8dee 0%, #7f54b3 100%);
+  }
+  
+  @media (max-width: 600px) {
+    .rbp-getting-started, .rbp-pro-upsell-banner, .rbp-pro-locked-notice {
+      padding: 18px 8px 18px 12px;
+      font-size: 1em;
+    }
+    .rbp-getting-started h1 {
+      font-size: 1.3em;
+    }
+  }
+  
