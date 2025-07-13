@@ -36,7 +36,9 @@ class RBP_Pro {
             }
         }
         // Multi-step Reminders
-        // ... (future logic)
+        add_action( 'woocommerce_order_status_completed', [ $this, 'schedule_multistep_reminders' ], 20, 1 );
+        add_action( 'woocommerce_order_status_processing', [ $this, 'schedule_multistep_reminders' ], 20, 1 );
+        add_action( 'rbp_send_multistep_reminder', [ $this, 'send_multistep_reminder' ], 10, 3 );
         // Advanced Template Builder
         // ... (future logic)
         // Conditional Reminders
@@ -71,7 +73,61 @@ class RBP_Pro {
         // Example: Fetch eligible orders and send SMS messages
     }
 
-    // Add stubs for other features as needed...
+    /**
+     * Schedule multi-step reminders for an order
+     */
+    public function schedule_multistep_reminders( $order_id ) {
+        $steps = get_option( 'rbp_pro_multistep_reminders', [] );
+        if ( empty( $steps ) ) return;
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) return;
+        foreach ( $steps as $idx => $step ) {
+            $days = absint( $step['days'] ?? 0 );
+            $channel = sanitize_text_field( $step['channel'] ?? '' );
+            $subject = sanitize_text_field( $step['subject'] ?? '' );
+            $body = wp_kses_post( $step['body'] ?? '' );
+            if ( $days < 1 || ! in_array( $channel, [ 'email', 'whatsapp', 'sms' ] ) ) continue;
+            $send_time = strtotime( '+' . $days . ' days', current_time( 'timestamp' ) );
+            wp_schedule_single_event( $send_time, 'rbp_send_multistep_reminder', [ $order_id, $idx, $channel ] );
+        }
+    }
+
+    /**
+     * Send a multi-step reminder
+     */
+    public function send_multistep_reminder( $order_id, $step_idx, $channel ) {
+        $steps = get_option( 'rbp_pro_multistep_reminders', [] );
+        if ( empty( $steps[$step_idx] ) ) return;
+        $step = $steps[$step_idx];
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) return;
+        // Prevent duplicate sends
+        $meta_key = '_rbp_multistep_sent_' . $step_idx . '_' . $channel;
+        if ( get_post_meta( $order_id, $meta_key, true ) ) return;
+        // Send via the selected channel
+        if ( $channel === 'email' ) {
+            $subject = $step['subject'] ?: __( 'We’d love your review!', 'reviewboost-pro' );
+            $body = $step['body'] ?: __( 'Please review your order.', 'reviewboost-pro' );
+            // Merge tags
+            $merge_tags = [
+                '[customer_name]' => esc_html( $order->get_billing_first_name() ),
+                '[order_id]'      => $order->get_id(),
+            ];
+            foreach ( $merge_tags as $tag => $value ) {
+                $subject = str_replace( $tag, $value, $subject );
+                $body = str_replace( $tag, $value, $body );
+            }
+            $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+            wp_mail( $order->get_billing_email(), $subject, $body, $headers );
+        } elseif ( $channel === 'whatsapp' ) {
+            // TODO: Implement WhatsApp sending
+        } elseif ( $channel === 'sms' ) {
+            // TODO: Implement SMS sending
+        }
+        update_post_meta( $order_id, $meta_key, 1 );
+        // Log event
+        RBP_Logger::log_event( $order_id, $order->get_customer_id(), $channel, current_time( 'mysql' ), 'sent', 0 );
+    }
 }
 
 // Initialize Pro module if not already loaded

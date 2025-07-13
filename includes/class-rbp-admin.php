@@ -31,6 +31,25 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_pro_sms_sid', [ 'sanitize_callback' => 'sanitize_text_field' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_sms_token', [ 'sanitize_callback' => 'sanitize_text_field' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_sms_from', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		// Multi-step reminders (Pro)
+		register_setting( 'rbp_settings', 'rbp_pro_multistep_reminders', [ 'sanitize_callback' => [ $this, 'sanitize_multistep_reminders' ] ] );
+	}
+
+	/**
+	 * Sanitize and validate multi-step reminders array
+	 */
+	public function sanitize_multistep_reminders( $input ) {
+		if ( ! is_array( $input ) ) return [];
+		$sanitized = [];
+		foreach ( $input as $step ) {
+			$sanitized[] = [
+				'days'    => absint( $step['days'] ?? 0 ),
+				'channel' => sanitize_text_field( $step['channel'] ?? '' ),
+				'subject' => sanitize_text_field( $step['subject'] ?? '' ),
+				'body'    => wp_kses_post( $step['body'] ?? '' ),
+			];
+		}
+		return $sanitized;
 	}
 
 	public function render_settings_page() {
@@ -91,6 +110,69 @@ class RBP_Admin {
 						<th scope="row"><?php esc_html_e( 'SMS From Number', 'reviewboost-pro' ); ?></th>
 						<td><input type="text" name="rbp_pro_sms_from" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_from', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
+					<tr valign="top">
+						<th scope="row" colspan="2"><strong><?php esc_html_e( 'Multi-step Reminders (Pro)', 'reviewboost-pro' ); ?></strong></th>
+					</tr>
+					<tr valign="top">
+						<td colspan="2">
+							<div id="rbp-multistep-reminders">
+							<?php
+							$steps = get_option( 'rbp_pro_multistep_reminders', [] );
+							if ( empty( $steps ) ) {
+								$steps = [ [ 'days' => 3, 'channel' => 'email', 'subject' => '', 'body' => '' ] ];
+							}
+							foreach ( $steps as $i => $step ) {
+								?>
+								<div class="rbp-reminder-step" style="margin-bottom:1em;padding:1em;border:1px solid #ddd;">
+									<label><?php esc_html_e( 'Days after completion:', 'reviewboost-pro' ); ?></label>
+									<input type="number" name="rbp_pro_multistep_reminders[<?php echo $i; ?>][days]" value="<?php echo esc_attr( $step['days'] ); ?>" min="1" max="60" style="width:60px;" />
+									&nbsp;
+									<label><?php esc_html_e( 'Channel:', 'reviewboost-pro' ); ?></label>
+									<select name="rbp_pro_multistep_reminders[<?php echo $i; ?>][channel]">
+										<option value="email" <?php selected( $step['channel'], 'email' ); ?>>Email</option>
+										<option value="whatsapp" <?php selected( $step['channel'], 'whatsapp' ); ?>>WhatsApp</option>
+										<option value="sms" <?php selected( $step['channel'], 'sms' ); ?>>SMS</option>
+									</select>
+									<br/>
+									<label><?php esc_html_e( 'Subject (Email only):', 'reviewboost-pro' ); ?></label>
+									<input type="text" name="rbp_pro_multistep_reminders[<?php echo $i; ?>][subject]" value="<?php echo esc_attr( $step['subject'] ); ?>" class="regular-text" />
+									<br/>
+									<label><?php esc_html_e( 'Message:', 'reviewboost-pro' ); ?></label>
+									<textarea name="rbp_pro_multistep_reminders[<?php echo $i; ?>][body]" rows="3" cols="60"><?php echo esc_textarea( $step['body'] ); ?></textarea>
+								</div>
+								<?php
+							}
+							?>
+							<!-- Add/Remove JS (simple, for now) -->
+							<button type="button" id="rbp-add-reminder-step" class="button">+ <?php esc_html_e( 'Add Step', 'reviewboost-pro' ); ?></button>
+							<script type="text/javascript">
+							jQuery(document).ready(function($){
+								$('#rbp-add-reminder-step').click(function(){
+									var idx = $('#rbp-multistep-reminders .rbp-reminder-step').length;
+									var html = `<div class="rbp-reminder-step" style="margin-bottom:1em;padding:1em;border:1px solid #ddd;">
+										<label><?php esc_html_e( 'Days after completion:', 'reviewboost-pro' ); ?></label>
+										<input type="number" name="rbp_pro_multistep_reminders[`+idx+`][days]" value="3" min="1" max="60" style="width:60px;" />
+										&nbsp;
+										<label><?php esc_html_e( 'Channel:', 'reviewboost-pro' ); ?></label>
+										<select name="rbp_pro_multistep_reminders[`+idx+`][channel]">
+											<option value="email">Email</option>
+											<option value="whatsapp">WhatsApp</option>
+											<option value="sms">SMS</option>
+										</select>
+										<br/>
+										<label><?php esc_html_e( 'Subject (Email only):', 'reviewboost-pro' ); ?></label>
+										<input type="text" name="rbp_pro_multistep_reminders[`+idx+`][subject]" value="" class="regular-text" />
+										<br/>
+										<label><?php esc_html_e( 'Message:', 'reviewboost-pro' ); ?></label>
+										<textarea name="rbp_pro_multistep_reminders[`+idx+`][body]" rows="3" cols="60"></textarea>
+									</div>`;
+									$('#rbp-multistep-reminders').append(html);
+								});
+							});
+							</script>
+						</td>
+					</tr>
+					<!-- End Multi-step Reminders -->
 				</table>
 				<?php submit_button(); ?>
 			</form>
