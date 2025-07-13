@@ -82,6 +82,35 @@ class RBP_Pro {
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
         foreach ( $steps as $idx => $step ) {
+            // --- Conditional Logic ---
+            $matches = true;
+            // Order total
+            if ( isset($step['order_total']) && $step['order_total'] !== '' ) {
+                if ( floatval($order->get_total()) < floatval($step['order_total']) ) $matches = false;
+            }
+            // Products
+            if ( !empty($step['products']) ) {
+                $order_product_ids = array_map(function($item){ return $item->get_product_id(); }, $order->get_items());
+                if ( !array_intersect($step['products'], $order_product_ids) ) $matches = false;
+            }
+            // Categories
+            if ( !empty($step['categories']) ) {
+                $order_cat_ids = [];
+                foreach ( $order->get_items() as $item ) {
+                    $prods = wc_get_product( $item->get_product_id() );
+                    if ( $prods ) {
+                        $order_cat_ids = array_merge( $order_cat_ids, wp_get_post_terms( $prods->get_id(), 'product_cat', [ 'fields' => 'ids' ] ) );
+                    }
+                }
+                if ( !array_intersect($step['categories'], $order_cat_ids) ) $matches = false;
+            }
+            // Countries
+            if ( !empty($step['countries']) ) {
+                $billing_country = $order->get_billing_country();
+                if ( !in_array($billing_country, $step['countries']) ) $matches = false;
+            }
+            if ( !$matches ) continue;
+            // --- End Conditional Logic ---
             $days = absint( $step['days'] ?? 0 );
             $channel = sanitize_text_field( $step['channel'] ?? '' );
             $subject = sanitize_text_field( $step['subject'] ?? '' );
@@ -101,6 +130,31 @@ class RBP_Pro {
         $step = $steps[$step_idx];
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
+        // --- Conditional Logic (repeat at send time) ---
+        $matches = true;
+        if ( isset($step['order_total']) && $step['order_total'] !== '' ) {
+            if ( floatval($order->get_total()) < floatval($step['order_total']) ) $matches = false;
+        }
+        if ( !empty($step['products']) ) {
+            $order_product_ids = array_map(function($item){ return $item->get_product_id(); }, $order->get_items());
+            if ( !array_intersect($step['products'], $order_product_ids) ) $matches = false;
+        }
+        if ( !empty($step['categories']) ) {
+            $order_cat_ids = [];
+            foreach ( $order->get_items() as $item ) {
+                $prods = wc_get_product( $item->get_product_id() );
+                if ( $prods ) {
+                    $order_cat_ids = array_merge( $order_cat_ids, wp_get_post_terms( $prods->get_id(), 'product_cat', [ 'fields' => 'ids' ] ) );
+                }
+            }
+            if ( !array_intersect($step['categories'], $order_cat_ids) ) $matches = false;
+        }
+        if ( !empty($step['countries']) ) {
+            $billing_country = $order->get_billing_country();
+            if ( !in_array($billing_country, $step['countries']) ) $matches = false;
+        }
+        if ( !$matches ) return;
+        // --- End Conditional Logic ---
         // Prevent duplicate sends
         $meta_key = '_rbp_multistep_sent_' . $step_idx . '_' . $channel;
         if ( get_post_meta( $order_id, $meta_key, true ) ) return;
