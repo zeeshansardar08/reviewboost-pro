@@ -65,6 +65,10 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_expiry_days', [ 'sanitize_callback' => 'absint' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_email_template', [ 'sanitize_callback' => 'wp_kses_post' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_log_enabled', [ 'sanitize_callback' => 'absint' ] );
+		// GDPR Consent (Pro)
+		register_setting( 'rbp_settings', 'rbp_pro_gdpr_consent_enabled', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_gdpr_consent_label', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_gdpr_privacy_url', [ 'sanitize_callback' => 'esc_url_raw' ] );
 		// License key and status (remove, now handled by Freemius)
 		// register_setting( 'rbp_pro_settings', 'rbp_pro_license_key', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
 		// register_setting( 'rbp_pro_settings', 'rbp_pro_license_status', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
@@ -332,77 +336,93 @@ class RBP_Admin {
 						<td><input type="checkbox" name="rbp_pro_coupon_log_enabled" value="1" <?php checked( get_option('rbp_pro_coupon_log_enabled', 1), 1 ); ?> /></td>
 					</tr>
 					<!-- End Auto-Coupon on Review -->
-				</table>
-				<h2><?php esc_html_e( 'Advanced Template Builder (Pro)', 'reviewboost-pro' ); ?></h2>
-				<div id="rbp-template-builder">
-					<ul class="rbp-template-tabs">
-						<li class="active"><a href="#rbp-tpl-email">Email</a></li>
-						<li><a href="#rbp-tpl-whatsapp">WhatsApp</a></li>
-						<li><a href="#rbp-tpl-sms">SMS</a></li>
-					</ul>
-					<div class="rbp-template-tab-content" id="rbp-tpl-email">
-						<?php $tpl = get_option('rbp_pro_templates', []); $email = $tpl['email'] ?? ['header'=>'','body'=>'','footer'=>'','button'=>'']; ?>
-						<h4><?php esc_html_e('Email Template', 'reviewboost-pro'); ?></h4>
-						<label><?php esc_html_e('Header:', 'reviewboost-pro'); ?></label>
-						<?php wp_editor( $email['header'], 'rbp_pro_templates_email_header', [ 'textarea_name' => 'rbp_pro_templates[email][header]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
-						<label><?php esc_html_e('Body:', 'reviewboost-pro'); ?></label>
-						<?php wp_editor( $email['body'], 'rbp_pro_templates_email_body', [ 'textarea_name' => 'rbp_pro_templates[email][body]', 'media_buttons' => false, 'textarea_rows' => 6 ] ); ?>
-						<label><?php esc_html_e('Button (HTML allowed):', 'reviewboost-pro'); ?></label>
-						<input type="text" name="rbp_pro_templates[email][button]" value="<?php echo esc_attr($email['button']); ?>" class="regular-text" />
-						<label><?php esc_html_e('Footer:', 'reviewboost-pro'); ?></label>
-						<?php wp_editor( $email['footer'], 'rbp_pro_templates_email_footer', [ 'textarea_name' => 'rbp_pro_templates[email][footer]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
-						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[product_list]</code> <code>[review_url]</code></p>
-						<!-- TODO: Add live preview, emoji picker, and drag/drop sections -->
-					</div>
-					<div class="rbp-template-tab-content" id="rbp-tpl-whatsapp" style="display:none;">
-						<?php $wa = $tpl['whatsapp'] ?? ['body'=>'']; ?>
-						<h4><?php esc_html_e('WhatsApp Template', 'reviewboost-pro'); ?></h4>
-						<textarea name="rbp_pro_templates[whatsapp][body]" rows="4" cols="80"><?php echo esc_textarea($wa['body']); ?></textarea>
-						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
-						<!-- TODO: Add emoji picker -->
-					</div>
-					<div class="rbp-template-tab-content" id="rbp-tpl-sms" style="display:none;">
-						<?php $sms = $tpl['sms'] ?? ['body'=>'']; ?>
-						<h4><?php esc_html_e('SMS Template', 'reviewboost-pro'); ?></h4>
-						<textarea name="rbp_pro_templates[sms][body]" rows="3" cols="80"><?php echo esc_textarea($sms['body']); ?></textarea>
-						<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
-						<!-- TODO: Add emoji picker -->
-					</div>
-					<script type="text/javascript">
-					jQuery(document).ready(function($){
-						$('.rbp-template-tabs a').click(function(e){
-							e.preventDefault();
-							$('.rbp-template-tabs li').removeClass('active');
-							$(this).parent().addClass('active');
-							$('.rbp-template-tab-content').hide();
-							$($(this).attr('href')).show();
+					<h2><?php esc_html_e('GDPR & Privacy (Pro)','reviewboost-pro'); ?></h2>
+					<table class="form-table">
+						<tr valign="top">
+							<th scope="row"><?php esc_html_e('Require Consent for Review Reminders','reviewboost-pro'); ?></th>
+							<td><input type="checkbox" name="rbp_pro_gdpr_consent_enabled" value="1" <?php checked( get_option('rbp_pro_gdpr_consent_enabled', 1), 1 ); ?> />
+							<?php esc_html_e('Require explicit customer consent at checkout before sending review reminders or marketing messages.','reviewboost-pro'); ?></td>
+						</tr>
+						<tr valign="top">
+							<th scope="row"><?php esc_html_e('Consent Checkbox Label','reviewboost-pro'); ?></th>
+							<td><input type="text" name="rbp_pro_gdpr_consent_label" value="<?php echo esc_attr(get_option('rbp_pro_gdpr_consent_label',__('I agree to receive review reminders and marketing from this store.','reviewboost-pro'))); ?>" style="width: 100%; max-width: 480px;" /></td>
+						</tr>
+						<tr valign="top">
+							<th scope="row"><?php esc_html_e('Privacy Policy URL','reviewboost-pro'); ?></th>
+							<td><input type="url" name="rbp_pro_gdpr_privacy_url" value="<?php echo esc_attr(get_option('rbp_pro_gdpr_privacy_url','')); ?>" style="width: 100%; max-width: 480px;" />
+							<br/><small><?php esc_html_e('Link customers to your privacy policy from the consent checkbox.','reviewboost-pro'); ?></small></td>
+						</tr>
+					</table>
+					<h2><?php esc_html_e( 'Advanced Template Builder (Pro)', 'reviewboost-pro' ); ?></h2>
+					<div id="rbp-template-builder">
+						<ul class="rbp-template-tabs">
+							<li class="active"><a href="#rbp-tpl-email">Email</a></li>
+							<li><a href="#rbp-tpl-whatsapp">WhatsApp</a></li>
+							<li><a href="#rbp-tpl-sms">SMS</a></li>
+						</ul>
+						<div class="rbp-template-tab-content" id="rbp-tpl-email">
+							<?php $tpl = get_option('rbp_pro_templates', []); $email = $tpl['email'] ?? ['header'=>'','body'=>'','footer'=>'','button'=>'']; ?>
+							<h4><?php esc_html_e('Email Template', 'reviewboost-pro'); ?></h4>
+							<label><?php esc_html_e('Header:', 'reviewboost-pro'); ?></label>
+							<?php wp_editor( $email['header'], 'rbp_pro_templates_email_header', [ 'textarea_name' => 'rbp_pro_templates[email][header]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
+							<label><?php esc_html_e('Body:', 'reviewboost-pro'); ?></label>
+							<?php wp_editor( $email['body'], 'rbp_pro_templates_email_body', [ 'textarea_name' => 'rbp_pro_templates[email][body]', 'media_buttons' => false, 'textarea_rows' => 6 ] ); ?>
+							<label><?php esc_html_e('Button (HTML allowed):', 'reviewboost-pro'); ?></label>
+							<input type="text" name="rbp_pro_templates[email][button]" value="<?php echo esc_attr($email['button']); ?>" class="regular-text" />
+							<label><?php esc_html_e('Footer:', 'reviewboost-pro'); ?></label>
+							<?php wp_editor( $email['footer'], 'rbp_pro_templates_email_footer', [ 'textarea_name' => 'rbp_pro_templates[email][footer]', 'media_buttons' => false, 'textarea_rows' => 2 ] ); ?>
+							<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[product_list]</code> <code>[review_url]</code></p>
+							<!-- TODO: Add live preview, emoji picker, and drag/drop sections -->
+						</div>
+						<div class="rbp-template-tab-content" id="rbp-tpl-whatsapp" style="display:none;">
+							<?php $wa = $tpl['whatsapp'] ?? ['body'=>'']; ?>
+							<h4><?php esc_html_e('WhatsApp Template', 'reviewboost-pro'); ?></h4>
+							<textarea name="rbp_pro_templates[whatsapp][body]" rows="4" cols="80"><?php echo esc_textarea($wa['body']); ?></textarea>
+							<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
+							<!-- TODO: Add emoji picker -->
+						</div>
+						<div class="rbp-template-tab-content" id="rbp-tpl-sms" style="display:none;">
+							<?php $sms = $tpl['sms'] ?? ['body'=>'']; ?>
+							<h4><?php esc_html_e('SMS Template', 'reviewboost-pro'); ?></h4>
+							<textarea name="rbp_pro_templates[sms][body]" rows="3" cols="80"><?php echo esc_textarea($sms['body']); ?></textarea>
+							<p><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[order_id]</code> <code>[review_url]</code></p>
+							<!-- TODO: Add emoji picker -->
+						</div>
+						<script type="text/javascript">
+						jQuery(document).ready(function($){
+							$('.rbp-template-tabs a').click(function(e){
+								e.preventDefault();
+								$('.rbp-template-tabs li').removeClass('active');
+								$(this).parent().addClass('active');
+								$('.rbp-template-tab-content').hide();
+								$($(this).attr('href')).show();
+							});
 						});
-					});
-					</script>
-				</div>
-				<?php settings_fields( 'rbp_pro_settings' ); ?>
-				<h2><?php esc_html_e('License','reviewboost-pro'); ?></h2>
-				<table class="form-table">
-					<tr><th scope="row"><?php esc_html_e('License Key','reviewboost-pro'); ?></th>
-						<td><?php esc_html_e('License management is now handled by Freemius.','reviewboost-pro'); ?></td></tr>
-				</table>
-
-				<?php if ( function_exists('fs') && ! fs()->can_use_premium_code() ) : ?>
-					<div class="rbp-pro-upsell-banner" style="border:2px solid #7f54b3;background:#f9f6ff;padding:18px 18px 18px 60px;position:relative;margin:24px 0;">
-						<span class="dashicons dashicons-awards" style="position:absolute;left:18px;top:18px;font-size:28px;color:#7f54b3;"></span>
-						<strong><?php esc_html_e('Unlock WhatsApp & SMS Reminders, Advanced Logging, Multi-step Automation, and more!','reviewboost-pro'); ?></strong><br>
-						<?php esc_html_e('Upgrade to ReviewBoost Pro and supercharge your store reviews.','reviewboost-pro'); ?>
-						<br><a href="https://your-upgrade-page.com" target="_blank" class="button button-primary" style="margin-top:10px;"><?php esc_html_e('Learn More & Upgrade','reviewboost-pro'); ?></a>
+						</script>
 					</div>
-				<?php endif; ?>
-				<?php submit_button(); ?>
-			</form>
+					<?php settings_fields( 'rbp_pro_settings' ); ?>
+					<h2><?php esc_html_e('License','reviewboost-pro'); ?></h2>
+					<table class="form-table">
+						<tr><th scope="row"><?php esc_html_e('License Key','reviewboost-pro'); ?></th>
+							<td><?php esc_html_e('License management is now handled by Freemius.','reviewboost-pro'); ?></td></tr>
+					</table>
 
-			<hr />
-			<h2><?php esc_html_e( 'Recent Reminder Log', 'reviewboost-pro' ); ?></h2>
-			<!-- Log table ... -->
-		</div>
-		<?php
+					<?php if ( function_exists('fs') && ! fs()->can_use_premium_code() ) : ?>
+						<div class="rbp-pro-upsell-banner" style="border:2px solid #7f54b3;background:#f9f6ff;padding:18px 18px 18px 60px;position:relative;margin:24px 0;">
+							<span class="dashicons dashicons-awards" style="position:absolute;left:18px;top:18px;font-size:28px;color:#7f54b3;"></span>
+							<strong><?php esc_html_e('Unlock WhatsApp & SMS Reminders, Advanced Logging, Multi-step Automation, and more!','reviewboost-pro'); ?></strong><br>
+							<?php esc_html_e('Upgrade to ReviewBoost Pro and supercharge your store reviews.','reviewboost-pro'); ?>
+							<br><a href="https://your-upgrade-page.com" target="_blank" class="button button-primary" style="margin-top:10px;"><?php esc_html_e('Learn More & Upgrade','reviewboost-pro'); ?></a>
+						</div>
+					<?php endif; ?>
+					<?php submit_button(); ?>
+				</form>
+
+				<hr />
+				<h2><?php esc_html_e( 'Recent Reminder Log', 'reviewboost-pro' ); ?></h2>
+				<!-- Log table ... -->
+			</div>
+			<?php
 	}
 
 	/**
@@ -449,6 +469,12 @@ class RBP_Admin {
 		if ( $q ) {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
+		}
+		// Consent filter
+		$consent = isset($_GET['consent']) ? sanitize_text_field($_GET['consent']) : '';
+		if ( $consent !== '' ) {
+			$where .= ' AND order_id IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key="_rbp_gdpr_consent" AND meta_value=%s)';
+			$params[] = $consent;
 		}
 		// --- Analytics summary ---
 		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
@@ -501,6 +527,7 @@ class RBP_Admin {
 				<input type="number" name="customer_id" value="<?php echo esc_attr($customer_id); ?>" placeholder="<?php esc_attr_e('Customer ID','reviewboost-pro'); ?>" style="width:90px;" />
 				<input type="date" name="date_from" value="<?php echo esc_attr($date_from); ?>" />
 				<input type="date" name="date_to" value="<?php echo esc_attr($date_to); ?>" />
+				<select name="consent"><option value=""><?php esc_html_e('All Consent','reviewboost-pro'); ?></option><option value="yes" <?php selected($consent,'yes'); ?>><?php esc_html_e('Yes','reviewboost-pro'); ?></option><option value="no" <?php selected($consent,'no'); ?>><?php esc_html_e('No','reviewboost-pro'); ?></option></select>
 				<button type="submit" class="button"><?php esc_html_e('Filter','reviewboost-pro'); ?></button>
 				<?php wp_nonce_field('rbp_export_logs'); ?>
 				<button type="submit" name="export_csv" value="1" class="button button-secondary"><?php esc_html_e('Export CSV','reviewboost-pro'); ?></button>
@@ -513,10 +540,11 @@ class RBP_Admin {
 					<th><?php esc_html_e('Method','reviewboost-pro'); ?></th>
 					<th><?php esc_html_e('Status','reviewboost-pro'); ?></th>
 					<th><?php esc_html_e('Retry','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Consent','reviewboost-pro'); ?></th>
 					<th><?php esc_html_e('Details','reviewboost-pro'); ?></th>
 				</tr></thead>
 				<tbody>
-				<?php if (empty($logs)): ?><tr><td colspan="7"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
+				<?php if (empty($logs)): ?><tr><td colspan="8"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
 				<?php foreach($logs as $log): ?>
 				<tr class="rbp-log-row" data-log='<?php echo esc_attr(json_encode($log)); ?>' style="cursor:pointer;<?php if($log->status=='failed') echo 'background:#ffeaea;'; elseif($log->retry_count>0) echo 'background:#fffbe5;'; ?>">
 					<td><?php echo esc_html($log->timestamp); ?></td>
@@ -525,6 +553,7 @@ class RBP_Admin {
 					<td><?php echo esc_html($log->method); ?></td>
 					<td><?php echo esc_html($log->status); ?></td>
 					<td><?php echo esc_html($log->retry_count); ?></td>
+					<td><?php echo esc_html(get_post_meta($log->order_id, '_rbp_gdpr_consent', true)==='yes'?__('Yes','reviewboost-pro'):__('No','reviewboost-pro')); ?></td>
 					<td><pre style="white-space:pre-wrap;word-break:break-all;"><?php echo esc_html($log->details); ?></pre></td>
 				</tr>
 				<?php endforeach; ?>
@@ -605,6 +634,12 @@ class RBP_Admin {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
 		}
+		// Consent filter
+		$consent = isset($_POST['consent']) ? sanitize_text_field($_POST['consent']) : '';
+		if ( $consent !== '' ) {
+			$where .= ' AND order_id IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key="_rbp_gdpr_consent" AND meta_value=%s)';
+			$params[] = $consent;
+		}
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
 		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ), ARRAY_A );
@@ -655,6 +690,12 @@ class RBP_Admin {
 		if ( $q ) {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
+		}
+		// Consent filter
+		$consent = isset($_POST['consent']) ? sanitize_text_field($_POST['consent']) : '';
+		if ( $consent !== '' ) {
+			$where .= ' AND order_id IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key="_rbp_gdpr_consent" AND meta_value=%s)';
+			$params[] = $consent;
 		}
 		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY timestamp DESC", ...$params ), ARRAY_A );
 		if ( empty( $logs ) ) {
