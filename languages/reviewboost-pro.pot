@@ -1,0 +1,1 @@
+# Placeholder for translation template file. Actual .pot content will be generated using WP CLI or Poedit.
