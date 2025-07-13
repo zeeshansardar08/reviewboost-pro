@@ -38,13 +38,17 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_reminder_delay_days', [ 'sanitize_callback' => 'absint' ] );
 		register_setting( 'rbp_settings', 'rbp_enabled', [ 'sanitize_callback' => 'absint' ] );
 		// Pro fields
-		register_setting( 'rbp_settings', 'rbp_pro_enable_whatsapp', [ 'sanitize_callback' => 'absint' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_whatsapp_api_key', [ 'sanitize_callback' => 'sanitize_text_field' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_enable_sms', [ 'sanitize_callback' => 'absint' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_sms_provider', [ 'sanitize_callback' => 'sanitize_text_field' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_sms_sid', [ 'sanitize_callback' => 'sanitize_text_field' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_sms_token', [ 'sanitize_callback' => 'sanitize_text_field' ] );
-		register_setting( 'rbp_settings', 'rbp_pro_sms_from', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_enable_whatsapp', [ 'type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_whatsapp_api_sid', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_whatsapp_api_token', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_whatsapp_from', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_whatsapp_template', [ 'type' => 'string', 'sanitize_callback' => 'wp_kses_post' ] );
+
+		register_setting( 'rbp_pro_settings', 'rbp_pro_enable_sms', [ 'type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_sms_api_sid', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_sms_api_token', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_sms_from', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_pro_settings', 'rbp_pro_sms_template', [ 'type' => 'string', 'sanitize_callback' => 'wp_kses_post' ] );
 		// Multi-step reminders (Pro)
 		register_setting( 'rbp_settings', 'rbp_pro_multistep_reminders', [ 'sanitize_callback' => [ $this, 'sanitize_multistep_reminders' ] ] );
 		// Advanced Template Builder (Pro)
@@ -130,32 +134,39 @@ class RBP_Admin {
 					</tr>
 					<tr valign="top">
 						<th scope="row"><?php esc_html_e( 'WhatsApp API Key', 'reviewboost-pro' ); ?></th>
-						<td><input type="text" name="rbp_pro_whatsapp_api_key" value="<?php echo esc_attr( get_option( 'rbp_pro_whatsapp_api_key', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+						<td><input type="text" name="rbp_pro_whatsapp_api_sid" value="<?php echo esc_attr( get_option( 'rbp_pro_whatsapp_api_sid', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'WhatsApp API Token', 'reviewboost-pro' ); ?></th>
+						<td><input type="password" name="rbp_pro_whatsapp_api_token" value="<?php echo esc_attr( get_option( 'rbp_pro_whatsapp_api_token', '' ) ); ?>" class="regular-text" autocomplete="off" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'WhatsApp From Number', 'reviewboost-pro' ); ?></th>
+						<td><input type="text" name="rbp_pro_whatsapp_from" value="<?php echo esc_attr( get_option( 'rbp_pro_whatsapp_from', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'WhatsApp Message Template', 'reviewboost-pro' ); ?></th>
+						<td><textarea name="rbp_pro_whatsapp_template" rows="4" cols="60"><?php echo esc_textarea( get_option( 'rbp_pro_whatsapp_template', 'Hi [customer_name], please review your order [order_id]: [review_link]' ) ); ?></textarea> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
 						<th scope="row"><?php esc_html_e( 'Enable SMS Reminders', 'reviewboost-pro' ); ?></th>
 						<td><input type="checkbox" name="rbp_pro_enable_sms" value="1" <?php checked( 1, get_option( 'rbp_pro_enable_sms', 0 ) ); ?> /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
-						<th scope="row"><?php esc_html_e( 'SMS Provider', 'reviewboost-pro' ); ?></th>
-						<td>
-							<select name="rbp_pro_sms_provider">
-								<option value="twilio" <?php selected( get_option( 'rbp_pro_sms_provider', 'twilio' ), 'twilio' ); ?>>Twilio</option>
-								<option value="nexmo" <?php selected( get_option( 'rbp_pro_sms_provider', 'twilio' ), 'nexmo' ); ?>>Nexmo</option>
-							</select> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?>
-						</td>
-					</tr>
-					<tr valign="top">
 						<th scope="row"><?php esc_html_e( 'SMS API SID', 'reviewboost-pro' ); ?></th>
-						<td><input type="text" name="rbp_pro_sms_sid" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_sid', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+						<td><input type="text" name="rbp_pro_sms_api_sid" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_api_sid', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
 						<th scope="row"><?php esc_html_e( 'SMS API Token', 'reviewboost-pro' ); ?></th>
-						<td><input type="text" name="rbp_pro_sms_token" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_token', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+						<td><input type="password" name="rbp_pro_sms_api_token" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_api_token', '' ) ); ?>" class="regular-text" autocomplete="off" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
 						<th scope="row"><?php esc_html_e( 'SMS From Number', 'reviewboost-pro' ); ?></th>
 						<td><input type="text" name="rbp_pro_sms_from" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_from', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'SMS Message Template', 'reviewboost-pro' ); ?></th>
+						<td><textarea name="rbp_pro_sms_template" rows="4" cols="60"><?php echo esc_textarea( get_option( 'rbp_pro_sms_template', 'Hi [customer_name], please review your order [order_id]: [review_link]' ) ); ?></textarea> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
 						<th scope="row" colspan="2"><strong><?php esc_html_e( 'Multi-step Reminders (Pro)', 'reviewboost-pro' ); ?></strong></th>
