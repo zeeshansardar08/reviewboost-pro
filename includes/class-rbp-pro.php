@@ -24,13 +24,13 @@ class RBP_Pro {
         // SMS Reminders
         add_action( 'rbp_send_sms_reminders', [ $this, 'send_sms_reminders' ] );
         // Schedule WhatsApp reminders if enabled
-        if ( get_option( 'rbp_pro_enable_whatsapp', 0 ) && get_option( 'rbp_pro_whatsapp_api_key', '' ) ) {
+        if ( get_option( 'rbp_pro_enable_whatsapp', 0 ) && get_option( 'rbp_pro_whatsapp_api_sid', '' ) && get_option( 'rbp_pro_whatsapp_api_token', '' ) && get_option( 'rbp_pro_whatsapp_from', '' ) ) {
             if ( ! wp_next_scheduled( 'rbp_send_whatsapp_reminders' ) ) {
                 wp_schedule_event( time() + 600, 'hourly', 'rbp_send_whatsapp_reminders' );
             }
         }
         // Schedule SMS reminders if enabled
-        if ( get_option( 'rbp_pro_enable_sms', 0 ) && get_option( 'rbp_pro_sms_sid', '' ) && get_option( 'rbp_pro_sms_token', '' ) ) {
+        if ( get_option( 'rbp_pro_enable_sms', 0 ) && get_option( 'rbp_pro_sms_api_sid', '' ) && get_option( 'rbp_pro_sms_api_token', '' ) && get_option( 'rbp_pro_sms_from', '' ) ) {
             if ( ! wp_next_scheduled( 'rbp_send_sms_reminders' ) ) {
                 wp_schedule_event( time() + 900, 'hourly', 'rbp_send_sms_reminders' );
             }
@@ -56,21 +56,113 @@ class RBP_Pro {
     }
 
     /**
-     * Send WhatsApp reminders (stub)
+     * Send WhatsApp reminders
      */
     public function send_whatsapp_reminders() {
-        // Integrate with WhatsApp API (Twilio/Meta)
-        // TODO: Implement WhatsApp reminders for Pro users
-        // Example: Fetch eligible orders and send WhatsApp messages
+        global $wpdb;
+        $table = $wpdb->prefix . 'reviewboost_reminders';
+        $now = current_time('mysql');
+        $orders = $wpdb->get_results( $wpdb->prepare("SELECT * FROM $table WHERE channel = %s AND send_time <= %s AND sent = 0 LIMIT 20", 'whatsapp', $now) );
+        foreach ( $orders as $reminder ) {
+            $order = wc_get_order( $reminder->order_id );
+            if ( ! $order ) continue;
+            $phone = $order->get_billing_phone();
+            if ( ! $phone ) continue;
+            $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+            $review_link = get_permalink( wc_get_page_id( 'myaccount' ) ) . 'review/' . $order->get_id();
+            $template = get_option('rbp_pro_whatsapp_template','Hi [customer_name], please review your order [order_id]: [review_link]');
+            $message = str_replace([
+                '[customer_name]','[order_id]','[review_link]'
+            ], [
+                $customer_name,
+                $order->get_id(),
+                $review_link
+            ], $template);
+            $result = $this->send_twilio_message('whatsapp', $phone, $message);
+            // Log event
+            RBP_Logger::log_event(
+                $order->get_id(),
+                $order->get_customer_id(),
+                'whatsapp',
+                current_time('mysql'),
+                $result['success'] ? 'sent' : 'failed',
+                0,
+                $result['log']
+            );
+            // Mark as sent
+            if($result['success']) {
+                $wpdb->update($table, ['sent'=>1], ['id'=>$reminder->id]);
+            }
+        }
     }
 
     /**
-     * Send SMS reminders (stub)
+     * Send SMS reminders
      */
     public function send_sms_reminders() {
-        // Integrate with Twilio/Nexmo
-        // TODO: Implement SMS reminders for Pro users
-        // Example: Fetch eligible orders and send SMS messages
+        global $wpdb;
+        $table = $wpdb->prefix . 'reviewboost_reminders';
+        $now = current_time('mysql');
+        $orders = $wpdb->get_results( $wpdb->prepare("SELECT * FROM $table WHERE channel = %s AND send_time <= %s AND sent = 0 LIMIT 20", 'sms', $now) );
+        foreach ( $orders as $reminder ) {
+            $order = wc_get_order( $reminder->order_id );
+            if ( ! $order ) continue;
+            $phone = $order->get_billing_phone();
+            if ( ! $phone ) continue;
+            $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+            $review_link = get_permalink( wc_get_page_id( 'myaccount' ) ) . 'review/' . $order->get_id();
+            $template = get_option('rbp_pro_sms_template','Hi [customer_name], please review your order [order_id]: [review_link]');
+            $message = str_replace([
+                '[customer_name]','[order_id]','[review_link]'
+            ], [
+                $customer_name,
+                $order->get_id(),
+                $review_link
+            ], $template);
+            $result = $this->send_twilio_message('sms', $phone, $message);
+            // Log event
+            RBP_Logger::log_event(
+                $order->get_id(),
+                $order->get_customer_id(),
+                'sms',
+                current_time('mysql'),
+                $result['success'] ? 'sent' : 'failed',
+                0,
+                $result['log']
+            );
+            // Mark as sent
+            if($result['success']) {
+                $wpdb->update($table, ['sent'=>1], ['id'=>$reminder->id]);
+            }
+        }
+    }
+
+    /**
+     * Send WhatsApp or SMS via Twilio
+     */
+    private function send_twilio_message($channel, $to, $body) {
+        $sid = $channel === 'whatsapp' ? get_option('rbp_pro_whatsapp_api_sid','') : get_option('rbp_pro_sms_api_sid','');
+        $token = $channel === 'whatsapp' ? get_option('rbp_pro_whatsapp_api_token','') : get_option('rbp_pro_sms_api_token','');
+        $from = $channel === 'whatsapp' ? get_option('rbp_pro_whatsapp_from','') : get_option('rbp_pro_sms_from','');
+        if(!$sid || !$token || !$from) return ['success'=>false,'log'=>'Missing Twilio credentials'];
+        $url = 'https://api.twilio.com/2010-04-01/Accounts/' . rawurlencode($sid) . '/Messages.json';
+        $args = [
+            'body' => [
+                'To' => ($channel==='whatsapp' ? 'whatsapp:' : '') . $to,
+                'From' => $from,
+                'Body' => $body
+            ],
+            'headers' => [
+                'Authorization' => 'Basic ' . base64_encode($sid . ':' . $token)
+            ],
+            'timeout' => 20
+        ];
+        $response = wp_remote_post($url, $args);
+        if(is_wp_error($response)) return ['success'=>false,'log'=>$response->get_error_message()];
+        $code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        if($code>=200 && $code<300) return ['success'=>true,'log'=>$body];
+        return ['success'=>false,'log'=>$body];
     }
 
     /**
@@ -199,7 +291,17 @@ class RBP_Pro {
             foreach ( $merge_tags as $tag => $value ) {
                 $msg = str_replace( $tag, $value, $msg );
             }
-            // TODO: Send WhatsApp message
+            $result = $this->send_twilio_message('whatsapp', $order->get_billing_phone(), $msg);
+            // Log event
+            RBP_Logger::log_event(
+                $order->get_id(),
+                $order->get_customer_id(),
+                'whatsapp',
+                current_time('mysql'),
+                $result['success'] ? 'sent' : 'failed',
+                0,
+                $result['log']
+            );
         } elseif ( $channel === 'sms' ) {
             $sms_tpl = $tpl['sms']['body'] ?? '';
             $msg = $step['body'] ?: $sms_tpl;
@@ -211,7 +313,17 @@ class RBP_Pro {
             foreach ( $merge_tags as $tag => $value ) {
                 $msg = str_replace( $tag, $value, $msg );
             }
-            // TODO: Send SMS message
+            $result = $this->send_twilio_message('sms', $order->get_billing_phone(), $msg);
+            // Log event
+            RBP_Logger::log_event(
+                $order->get_id(),
+                $order->get_customer_id(),
+                'sms',
+                current_time('mysql'),
+                $result['success'] ? 'sent' : 'failed',
+                0,
+                $result['log']
+            );
         }
         update_post_meta( $order_id, $meta_key, 1 );
         // Log event
