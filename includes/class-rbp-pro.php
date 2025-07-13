@@ -53,6 +53,7 @@ class RBP_Pro {
         // ... (future logic)
         // Priority Support Widget
         // ... (future logic)
+        add_action( 'admin_notices', [ $this, 'show_license_required_notice' ] );
     }
 
     /**
@@ -420,6 +421,19 @@ class RBP_Pro {
         $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
         wp_mail( $email, __( 'Your Coupon for Reviewing', 'reviewboost-pro' ), $body, $headers );
         // TODO: WhatsApp/SMS delivery if enabled
+    }
+
+    public function show_license_required_notice() {
+        if ( ! current_user_can('manage_options') ) return;
+        $upgrade_url = 'https://your-upgrade-page.com'; // TODO: Replace with your real upgrade/pricing page
+        echo '<div class="notice notice-warning rbp-pro-locked-notice" style="border-left:6px solid #7f54b3;padding:18px 12px 18px 18px;display:flex;align-items:center;">'
+            .'<span class="dashicons dashicons-lock" style="font-size:28px;color:#7f54b3;margin-right:18px;"></span>'
+            .'<div>'
+            .'<strong>'.esc_html__('ReviewBoost Pro features are locked.','reviewboost-pro').'</strong><br>'
+            .esc_html__('Activate your license to unlock all premium features, including WhatsApp/SMS reminders, advanced logs, and more!','reviewboost-pro')
+            .'<br><a href="'.esc_url($upgrade_url).'" target="_blank" class="button button-primary" style="margin-top:10px;">'.esc_html__('Learn More & Upgrade','reviewboost-pro').'</a>'
+            .'</div>'
+            .'</div>';
     }
 }
 

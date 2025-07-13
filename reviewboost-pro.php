@@ -17,6 +17,9 @@
  * WC tested up to: 8.9
  */
 
+// Load Freemius SDK and initialize before anything else
+require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-freemius.php';
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }

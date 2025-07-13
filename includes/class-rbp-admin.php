@@ -8,6 +8,9 @@ class RBP_Admin {
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
 		add_action( 'wp_ajax_rbp_fetch_logs', [ $this, 'ajax_fetch_logs' ] );
 		add_action( 'wp_ajax_rbp_export_logs', [ $this, 'ajax_export_logs' ] );
+		add_action('admin_menu', [ $this, 'add_getting_started_page' ]);
+		add_action('admin_init', [ $this, 'maybe_redirect_to_getting_started' ]);
+		add_action('admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ]);
 	}
 
 	public function add_settings_page() {
@@ -62,6 +65,9 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_expiry_days', [ 'sanitize_callback' => 'absint' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_email_template', [ 'sanitize_callback' => 'wp_kses_post' ] );
 		register_setting( 'rbp_settings', 'rbp_pro_coupon_log_enabled', [ 'sanitize_callback' => 'absint' ] );
+		// License key and status (remove, now handled by Freemius)
+		// register_setting( 'rbp_pro_settings', 'rbp_pro_license_key', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
+		// register_setting( 'rbp_pro_settings', 'rbp_pro_license_status', [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ] );
 	}
 
 	/**
@@ -318,7 +324,7 @@ class RBP_Admin {
 						<td>
 							<textarea name="rbp_pro_coupon_email_template" rows="4" cols="70"><?php echo esc_textarea( get_option('rbp_pro_coupon_email_template', __( 'Thank you for your review! Here is your coupon code: [coupon_code]', 'reviewboost-pro' ) ) ); ?></textarea>
 							<br/>
-							<small><?php esc_html_e( 'Available merge tags:', 'reviewboost-pro' ); ?> <code>[customer_name]</code> <code>[coupon_code]</code> <code>[expiry_date]</code></small>
+							<small><?php esc_html_e('Available merge tags:', 'reviewboost-pro'); ?> <code>[customer_name]</code> <code>[coupon_code]</code> <code>[expiry_date]</code></small>
 						</td>
 					</tr>
 					<tr valign="top">
@@ -374,6 +380,21 @@ class RBP_Admin {
 					});
 					</script>
 				</div>
+				<?php settings_fields( 'rbp_pro_settings' ); ?>
+				<h2><?php esc_html_e('License','reviewboost-pro'); ?></h2>
+				<table class="form-table">
+					<tr><th scope="row"><?php esc_html_e('License Key','reviewboost-pro'); ?></th>
+						<td><?php esc_html_e('License management is now handled by Freemius.','reviewboost-pro'); ?></td></tr>
+				</table>
+
+				<?php if ( function_exists('fs') && ! fs()->can_use_premium_code() ) : ?>
+					<div class="rbp-pro-upsell-banner" style="border:2px solid #7f54b3;background:#f9f6ff;padding:18px 18px 18px 60px;position:relative;margin:24px 0;">
+						<span class="dashicons dashicons-awards" style="position:absolute;left:18px;top:18px;font-size:28px;color:#7f54b3;"></span>
+						<strong><?php esc_html_e('Unlock WhatsApp & SMS Reminders, Advanced Logging, Multi-step Automation, and more!','reviewboost-pro'); ?></strong><br>
+						<?php esc_html_e('Upgrade to ReviewBoost Pro and supercharge your store reviews.','reviewboost-pro'); ?>
+						<br><a href="https://your-upgrade-page.com" target="_blank" class="button button-primary" style="margin-top:10px;"><?php esc_html_e('Learn More & Upgrade','reviewboost-pro'); ?></a>
+					</div>
+				<?php endif; ?>
 				<?php submit_button(); ?>
 			</form>
 
@@ -649,6 +670,84 @@ class RBP_Admin {
 		}
 		fclose( $output );
 		exit;
+	}
+
+	/**
+	 * Enqueue custom admin CSS for ReviewBoost Pro
+	 */
+	public function enqueue_admin_assets($hook) {
+		// Only load on ReviewBoost Pro admin pages
+		if ( isset($_GET['page']) && strpos($_GET['page'], 'reviewboost-pro') !== false ) {
+			wp_enqueue_style('rbp-admin-css', plugins_url('../assets/admin.css', __FILE__), [], '1.0');
+		}
+	}
+
+	/**
+	 * Add Getting Started page and helpful links
+	 */
+	public function add_getting_started_page() {
+		add_submenu_page(
+			'reviewboost-pro',
+			__('Getting Started','reviewboost-pro'),
+			__('Getting Started','reviewboost-pro'),
+			'manage_options',
+			'rbp-getting-started',
+			[ $this, 'render_getting_started_page' ]
+		);
+		// Add Docs and Support links
+		add_submenu_page(
+			'reviewboost-pro',
+			__('Docs','reviewboost-pro'),
+			__('Docs','reviewboost-pro'),
+			'manage_options',
+			'rbp-docs',
+			function() { wp_redirect('https://your-docs-url.com'); exit; }
+		);
+		add_submenu_page(
+			'reviewboost-pro',
+			__('Get Support','reviewboost-pro'),
+			__('Get Support','reviewboost-pro'),
+			'manage_options',
+			'rbp-support',
+			function() { wp_redirect('https://your-support-url.com'); exit; }
+		);
+	}
+
+	/**
+	 * Render the Getting Started page
+	 */
+	public function render_getting_started_page() {
+		?>
+		<div class="wrap rbp-getting-started">
+			<h1 style="color:#7f54b3;"><span class="dashicons dashicons-star-filled" style="font-size:32px;vertical-align:middle;margin-right:8px;"></span> <?php esc_html_e('Welcome to ReviewBoost Pro!','reviewboost-pro'); ?></h1>
+			<p style="font-size:18px;max-width:680px;line-height:1.6;">
+				<?php esc_html_e('Thank you for choosing ReviewBoost Pro! Here’s how to get started and make the most of your review automation:', 'reviewboost-pro'); ?>
+			</p>
+			<ol style="font-size:16px;max-width:700px;">
+				<li><strong><?php esc_html_e('Connect WhatsApp & SMS (Pro):','reviewboost-pro'); ?></strong> <?php esc_html_e('Enter your Twilio credentials in the Pro settings to enable WhatsApp and SMS reminders.', 'reviewboost-pro'); ?></li>
+				<li><strong><?php esc_html_e('Customize Reminder Templates:','reviewboost-pro'); ?></strong> <?php esc_html_e('Use the Advanced Template Builder to personalize your email, WhatsApp, and SMS messages.', 'reviewboost-pro'); ?></li>
+				<li><strong><?php esc_html_e('Enable Multi-step Automations:','reviewboost-pro'); ?></strong> <?php esc_html_e('Set up multi-step reminders for maximum engagement.', 'reviewboost-pro'); ?></li>
+				<li><strong><?php esc_html_e('Track Results:','reviewboost-pro'); ?></strong> <?php esc_html_e('View all reminder logs and analytics in the Pro Dashboard.', 'reviewboost-pro'); ?></li>
+				<li><strong><?php esc_html_e('Need Help?','reviewboost-pro'); ?></strong> <a href="https://your-support-url.com" target="_blank"><?php esc_html_e('Get Support','reviewboost-pro'); ?></a> | <a href="https://your-docs-url.com" target="_blank"><?php esc_html_e('Read Docs','reviewboost-pro'); ?></a></li>
+			</ol>
+			<div style="margin-top:32px;">
+				<a href="https://your-upgrade-page.com" class="button button-primary button-hero" style="font-size:18px;"><?php esc_html_e('Upgrade to Pro','reviewboost-pro'); ?></a>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Redirect to Getting Started page after activation
+	 */
+	public function maybe_redirect_to_getting_started() {
+		if ( get_transient('rbp_do_activation_redirect') ) {
+			delete_transient('rbp_do_activation_redirect');
+			if ( ! isset($_GET['activate-multi']) ) {
+				wp_safe_redirect( admin_url('admin.php?page=rbp-getting-started') );
+				exit;
+			}
+		}
 	}
 }
 
