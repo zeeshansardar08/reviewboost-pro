@@ -54,6 +54,14 @@ class RBP_Pro {
         // Priority Support Widget
         // ... (future logic)
         add_action( 'admin_notices', [ $this, 'show_license_required_notice' ] );
+        if ( function_exists('fs') && fs()->can_use_premium_code() ) {
+            // GDPR Consent on Checkout
+            if ( get_option('rbp_pro_gdpr_consent_enabled', 1) ) {
+                add_action( 'woocommerce_review_order_before_submit', [ $this, 'add_gdpr_consent_checkbox' ] );
+                add_action( 'woocommerce_checkout_process', [ $this, 'validate_gdpr_consent_checkbox' ] );
+                add_action( 'woocommerce_checkout_update_order_meta', [ $this, 'save_gdpr_consent_order_meta' ] );
+            }
+        }
     }
 
     /**
@@ -67,6 +75,14 @@ class RBP_Pro {
         foreach ( $orders as $reminder ) {
             $order = wc_get_order( $reminder->order_id );
             if ( ! $order ) continue;
+            // GDPR consent check
+            if ( get_option('rbp_pro_gdpr_consent_enabled', 1) ) {
+                $consent = get_post_meta( $order->get_id(), '_rbp_gdpr_consent', true );
+                if ( $consent !== 'yes' ) {
+                    RBP_Logger::log_event( $order->get_id(), $order->get_customer_id(), 'whatsapp', current_time('mysql'), 'skipped_no_consent', 0 );
+                    continue;
+                }
+            }
             $phone = $order->get_billing_phone();
             if ( ! $phone ) continue;
             $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
@@ -108,6 +124,14 @@ class RBP_Pro {
         foreach ( $orders as $reminder ) {
             $order = wc_get_order( $reminder->order_id );
             if ( ! $order ) continue;
+            // GDPR consent check
+            if ( get_option('rbp_pro_gdpr_consent_enabled', 1) ) {
+                $consent = get_post_meta( $order->get_id(), '_rbp_gdpr_consent', true );
+                if ( $consent !== 'yes' ) {
+                    RBP_Logger::log_event( $order->get_id(), $order->get_customer_id(), 'sms', current_time('mysql'), 'skipped_no_consent', 0 );
+                    continue;
+                }
+            }
             $phone = $order->get_billing_phone();
             if ( ! $phone ) continue;
             $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
@@ -223,6 +247,14 @@ class RBP_Pro {
         $step = $steps[$step_idx];
         $order = wc_get_order( $order_id );
         if ( ! $order ) return;
+        // GDPR consent check
+        if ( get_option('rbp_pro_gdpr_consent_enabled', 1) ) {
+            $consent = get_post_meta( $order->get_id(), '_rbp_gdpr_consent', true );
+            if ( $consent !== 'yes' ) {
+                RBP_Logger::log_event( $order->get_id(), $order->get_customer_id(), $channel, current_time('mysql'), 'skipped_no_consent', 0 );
+                return;
+            }
+        }
         // --- Conditional Logic (repeat at send time) ---
         $matches = true;
         if ( isset($step['order_total']) && $step['order_total'] !== '' ) {
@@ -434,6 +466,41 @@ class RBP_Pro {
             .'<br><a href="'.esc_url($upgrade_url).'" target="_blank" class="button button-primary" style="margin-top:10px;">'.esc_html__('Learn More & Upgrade','reviewboost-pro').'</a>'
             .'</div>'
             .'</div>';
+    }
+
+    /**
+     * Add GDPR consent checkbox to WooCommerce checkout
+     */
+    public function add_gdpr_consent_checkbox() {
+        /* translators: Consent checkbox label for GDPR at checkout */
+        $label = get_option('rbp_pro_gdpr_consent_label', __('I agree to receive review reminders and marketing from this store.','reviewboost-pro'));
+        $privacy_url = get_option('rbp_pro_gdpr_privacy_url','');
+        if ( $privacy_url ) {
+            $label .= ' <a href="' . esc_url($privacy_url) . '" target="_blank">' . esc_html__('Privacy Policy','reviewboost-pro') . '</a>';
+        }
+        woocommerce_form_field( 'rbp_gdpr_consent', [
+            'type'    => 'checkbox',
+            'class'   => ['form-row-wide'],
+            'label'   => wp_kses_post($label),
+            'required'=> true,
+        ], WC()->checkout->get_value( 'rbp_gdpr_consent' ) );
+    }
+
+    /**
+     * Validate GDPR consent checkbox
+     */
+    public function validate_gdpr_consent_checkbox() {
+        /* translators: Error shown if customer does not check GDPR consent */
+        if ( ! isset( $_POST['rbp_gdpr_consent'] ) ) {
+            wc_add_notice( __( 'Please provide consent to receive review reminders and marketing.', 'reviewboost-pro' ), 'error' );
+        }
+    }
+
+    /**
+     * Save GDPR consent to order meta
+     */
+    public function save_gdpr_consent_order_meta( $order_id ) {
+        update_post_meta( $order_id, '_rbp_gdpr_consent', isset($_POST['rbp_gdpr_consent']) ? 'yes' : 'no' );
     }
 }
 
