@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class RBP_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_logs_dashboard_menu' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
 	}
 
@@ -15,6 +16,17 @@ class RBP_Admin {
 			'manage_woocommerce',
 			'reviewboost-pro',
 			[ $this, 'render_settings_page' ]
+		);
+	}
+
+	public function add_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-pro-logs',
+			[ $this, 'render_logs_dashboard' ]
 		);
 	}
 
@@ -355,6 +367,37 @@ class RBP_Admin {
 			<hr />
 			<h2><?php esc_html_e( 'Recent Reminder Log', 'reviewboost-pro' ); ?></h2>
 			<!-- Log table ... -->
+		</div>
+		<?php
+	}
+
+	/**
+	 * Add Pro Logs Dashboard menu
+	 */
+	public function add_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-pro-logs',
+			[ $this, 'render_logs_dashboard' ]
+		);
+	}
+
+	/**
+	 * Render the Pro Logs Dashboard page
+	 */
+	public function render_logs_dashboard() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'reviewboost-pro' ) );
+		}
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'ReviewBoost Pro Logs', 'reviewboost-pro' ); ?></h1>
+			<p><?php esc_html_e( 'View and export all reminder and coupon events.', 'reviewboost-pro' ); ?></p>
+			<!-- Logs table will be rendered here -->
+			<div id="rbp-pro-logs-table"></div>
 		</div>
 		<?php
 	}
