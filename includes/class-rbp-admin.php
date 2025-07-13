@@ -4,7 +4,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class RBP_Admin {
 	public function __construct() {
 		add_action( 'admin_menu', [ $this, 'add_settings_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_logs_dashboard_menu' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
+		add_action( 'wp_ajax_rbp_fetch_logs', [ $this, 'ajax_fetch_logs' ] );
+		add_action( 'wp_ajax_rbp_export_logs', [ $this, 'ajax_export_logs' ] );
 	}
 
 	public function add_settings_page() {
@@ -15,6 +18,17 @@ class RBP_Admin {
 			'manage_woocommerce',
 			'reviewboost-pro',
 			[ $this, 'render_settings_page' ]
+		);
+	}
+
+	public function add_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-pro-logs',
+			[ $this, 'render_logs_dashboard' ]
 		);
 	}
 
@@ -357,6 +371,273 @@ class RBP_Admin {
 			<!-- Log table ... -->
 		</div>
 		<?php
+	}
+
+	/**
+	 * Add Pro Logs Dashboard menu
+	 */
+	public function add_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			__( 'ReviewBoost Pro Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-pro-logs',
+			[ $this, 'render_logs_dashboard' ]
+		);
+	}
+
+	/**
+	 * Render the Pro Logs Dashboard page
+	 */
+	public function render_logs_dashboard() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'reviewboost-pro' ) );
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'reviewboost_logs';
+		// Filters (existing code)
+		$method = isset($_GET['method']) ? sanitize_text_field($_GET['method']) : '';
+		$status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
+		$order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : '';
+		$customer_id = isset($_GET['customer_id']) ? absint($_GET['customer_id']) : '';
+		$q = isset($_GET['q']) ? sanitize_text_field($_GET['q']) : '';
+		$date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
+		$date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
+		$page = isset($_GET['paged']) ? max(1, absint($_GET['paged'])) : 1;
+		$per_page = 20;
+		$where = 'WHERE 1=1';
+		$params = [];
+		if ( $method ) { $where .= ' AND method = %s'; $params[] = $method; }
+		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
+		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
+		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
+		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $q ) {
+			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
+			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
+		}
+		// --- Analytics summary ---
+		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
+		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(timestamp) FROM $table $where", ...$params ) );
+		// --- End analytics ---
+		// Export to CSV (existing code)
+		if ( isset($_GET['export_csv']) && check_admin_referer('rbp_export_logs') ) {
+			$logs = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM $table $where ORDER BY timestamp DESC",
+				...$params
+			), ARRAY_A );
+			headers_sent() || header('Content-Type: text/csv');
+			headers_sent() || header('Content-Disposition: attachment; filename=reviewboost-logs.csv');
+			$out = fopen('php://output', 'w');
+			fputcsv($out, ['Date','Order ID','Customer ID','Method','Status','Retry','Details']);
+			foreach ($logs as $log) {
+				fputcsv($out, [ $log['timestamp'], $log['order_id'], $log['customer_id'], $log['method'], $log['status'], $log['retry_count'], $log['details'] ]);
+			}
+			fclose($out); exit;
+		}
+		// Pagination (existing code)
+		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
+		$offset = ( $page - 1 ) * $per_page;
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		// Get unique methods/status for filters
+		$methods = $wpdb->get_col( "SELECT DISTINCT method FROM $table ORDER BY method" );
+		$statuses = $wpdb->get_col( "SELECT DISTINCT status FROM $table ORDER BY status" );
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'ReviewBoost Pro Logs', 'reviewboost-pro' ); ?></h1>
+			<p><?php esc_html_e( 'View and export all reminder and coupon events.', 'reviewboost-pro' ); ?></p>
+			<!-- Analytics summary -->
+			<div class="rbp-logs-analytics" style="margin-bottom:20px;background:#f9f9f9;border:1px solid #e1e1e1;padding:12px 18px;display:flex;gap:32px;align-items:center;">
+				<div><strong><?php esc_html_e('Total','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['total']); ?></div>
+				<div><strong><?php esc_html_e('Sent','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['sent']); ?></div>
+				<div><strong><?php esc_html_e('Failed','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['failed']); ?></div>
+				<div><strong><?php esc_html_e('Email','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['email']); ?></div>
+				<div><strong><?php esc_html_e('WhatsApp','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['whatsapp']); ?></div>
+				<div><strong><?php esc_html_e('SMS','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['sms']); ?></div>
+				<div><strong><?php esc_html_e('Coupon','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['coupon']); ?></div>
+				<div><strong><?php esc_html_e('Most Recent','reviewboost-pro'); ?>:</strong> <?php echo esc_html($recent ? $recent : __('N/A','reviewboost-pro')); ?></div>
+			</div>
+			<!-- End analytics summary -->
+			<form method="get">
+				<input type="hidden" name="page" value="rbp-pro-logs" />
+				<input type="text" name="q" value="<?php echo esc_attr($q); ?>" placeholder="<?php esc_attr_e('Search Order/Customer/Details','reviewboost-pro'); ?>" />
+				<select name="method"><option value=""><?php esc_html_e('All Methods','reviewboost-pro'); ?></option><?php foreach($methods as $m): ?><option value="<?php echo esc_attr($m); ?>" <?php selected($m,$method); ?>><?php echo esc_html($m); ?></option><?php endforeach; ?></select>
+				<select name="status"><option value=""><?php esc_html_e('All Status','reviewboost-pro'); ?></option><?php foreach($statuses as $s): ?><option value="<?php echo esc_attr($s); ?>" <?php selected($s,$status); ?>><?php echo esc_html($s); ?></option><?php endforeach; ?></select>
+				<input type="number" name="order_id" value="<?php echo esc_attr($order_id); ?>" placeholder="<?php esc_attr_e('Order ID','reviewboost-pro'); ?>" style="width:90px;" />
+				<input type="number" name="customer_id" value="<?php echo esc_attr($customer_id); ?>" placeholder="<?php esc_attr_e('Customer ID','reviewboost-pro'); ?>" style="width:90px;" />
+				<input type="date" name="date_from" value="<?php echo esc_attr($date_from); ?>" />
+				<input type="date" name="date_to" value="<?php echo esc_attr($date_to); ?>" />
+				<button type="submit" class="button"><?php esc_html_e('Filter','reviewboost-pro'); ?></button>
+				<?php wp_nonce_field('rbp_export_logs'); ?>
+				<button type="submit" name="export_csv" value="1" class="button button-secondary"><?php esc_html_e('Export CSV','reviewboost-pro'); ?></button>
+			</form>
+			<table class="widefat striped" style="margin-top:1em;">
+				<thead><tr>
+					<th><?php esc_html_e('Date','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Order ID','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Customer ID','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Method','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Status','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Retry','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Details','reviewboost-pro'); ?></th>
+				</tr></thead>
+				<tbody>
+				<?php if (empty($logs)): ?><tr><td colspan="7"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
+				<?php foreach($logs as $log): ?>
+				<tr class="rbp-log-row" data-log='<?php echo esc_attr(json_encode($log)); ?>' style="cursor:pointer;<?php if($log->status=='failed') echo 'background:#ffeaea;'; elseif($log->retry_count>0) echo 'background:#fffbe5;'; ?>">
+					<td><?php echo esc_html($log->timestamp); ?></td>
+					<td><?php echo esc_html($log->order_id); ?></td>
+					<td><?php echo esc_html($log->customer_id); ?></td>
+					<td><?php echo esc_html($log->method); ?></td>
+					<td><?php echo esc_html($log->status); ?></td>
+					<td><?php echo esc_html($log->retry_count); ?></td>
+					<td><pre style="white-space:pre-wrap;word-break:break-all;"><?php echo esc_html($log->details); ?></pre></td>
+				</tr>
+				<?php endforeach; ?>
+				<?php endif; ?>
+				</tbody>
+			</table>
+			<!-- Log detail modal -->
+			<div id="rbp-log-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:9999;align-items:center;justify-content:center;">
+				<div style="background:#fff;padding:24px 32px;max-width:600px;width:90vw;max-height:90vh;overflow:auto;position:relative;box-shadow:0 2px 16px #0002;">
+					<button onclick="document.getElementById('rbp-log-modal').style.display='none';" style="position:absolute;top:8px;right:8px;">&times;</button>
+					<h2><?php esc_html_e('Log Details','reviewboost-pro'); ?></h2>
+					<pre id="rbp-log-modal-content" style="white-space:pre-wrap;word-break:break-all;background:#f9f9f9;padding:12px 16px;"></pre>
+				</div>
+			</div>
+			<script>
+			(function(){
+				document.querySelectorAll('.rbp-log-row').forEach(function(row){
+					row.addEventListener('click', function(){
+						var log = JSON.parse(this.getAttribute('data-log'));
+						var content = '';
+						for(var k in log){
+							content += k+': '+(typeof log[k]==='object'?JSON.stringify(log[k],null,2):log[k])+"\n";
+						}
+						document.getElementById('rbp-log-modal-content').textContent = content;
+						document.getElementById('rbp-log-modal').style.display = 'flex';
+					});
+				});
+			})();
+			</script>
+			<?php
+			// Pagination (existing code)
+			$total_pages = ceil($total/$per_page);
+			if ( $total_pages > 1 ) {
+				$page_base = remove_query_arg('paged');
+				echo '<div class="tablenav"><span class="pagination-links">';
+				for ( $p = 1; $p <= $total_pages; $p++ ) {
+					if ( $p == $page ) {
+						echo '<span class="tablenav-pages-navspan">' . $p . '</span> ';
+					} else {
+						echo '<a href="' . esc_url(add_query_arg('paged', $p, $page_base)) . '">' . $p . '</a> ';
+					}
+				}
+				echo '</span></div>';
+			}
+			?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * AJAX handler for logs table
+	 */
+	public function ajax_fetch_logs() {
+		if ( ! current_user_can( 'manage_woocommerce' ) || ! check_ajax_referer('rbp_logs_dashboard','nonce', false) ) {
+			wp_send_json_error(['message'=>__('Unauthorized','reviewboost-pro')]);
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'reviewboost_logs';
+		// Collect filters
+		$method = isset($_POST['method']) ? sanitize_text_field($_POST['method']) : '';
+		$status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+		$order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : '';
+		$customer_id = isset($_POST['customer_id']) ? absint($_POST['customer_id']) : '';
+		$q = isset($_POST['q']) ? sanitize_text_field($_POST['q']) : '';
+		$date_from = isset($_POST['date_from']) ? sanitize_text_field($_POST['date_from']) : '';
+		$date_to = isset($_POST['date_to']) ? sanitize_text_field($_POST['date_to']) : '';
+		$page = isset($_POST['paged']) ? max(1, absint($_POST['paged'])) : 1;
+		$per_page = 20;
+		$where = 'WHERE 1=1';
+		$params = [];
+		if ( $method ) { $where .= ' AND method = %s'; $params[] = $method; }
+		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
+		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
+		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
+		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $q ) {
+			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
+			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
+		}
+		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
+		$offset = ( $page - 1 ) * $per_page;
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ), ARRAY_A );
+		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
+		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(timestamp) FROM $table $where", ...$params ) );
+		$method_counts = $wpdb->get_results( $wpdb->prepare( "SELECT method, COUNT(*) as count FROM $table $where GROUP BY method", ...$params ), ARRAY_A );
+		$status_counts = $wpdb->get_results( $wpdb->get_prepare( "SELECT status, COUNT(*) as count FROM $table $where GROUP BY status", ...$params ), ARRAY_A );
+		$methods = $wpdb->get_col( "SELECT DISTINCT method FROM $table ORDER BY method" );
+		$statuses = $wpdb->get_col( "SELECT DISTINCT status FROM $table ORDER BY status" );
+		wp_send_json_success([
+			'logs'=>$logs,
+			'total'=>$total,
+			'page'=>$page,
+			'per_page'=>$per_page,
+			'stats'=>$stats,
+			'recent'=>$recent,
+			'method_counts'=>$method_counts,
+			'status_counts'=>$status_counts,
+			'methods'=>$methods,
+			'statuses'=>$statuses
+		]);
+	}
+
+	/**
+	 * AJAX handler for exporting logs as CSV
+	 */
+	public function ajax_export_logs() {
+		if ( ! current_user_can( 'manage_woocommerce' ) || ! check_ajax_referer('rbp_logs_dashboard','nonce', false) ) {
+			wp_send_json_error(['message'=>__('Unauthorized','reviewboost-pro')]);
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'reviewboost_logs';
+		$method = isset($_POST['method']) ? sanitize_text_field($_POST['method']) : '';
+		$status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+		$order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : '';
+		$customer_id = isset($_POST['customer_id']) ? absint($_POST['customer_id']) : '';
+		$q = isset($_POST['q']) ? sanitize_text_field($_POST['q']) : '';
+		$date_from = isset($_POST['date_from']) ? sanitize_text_field($_POST['date_from']) : '';
+		$date_to = isset($_POST['date_to']) ? sanitize_text_field($_POST['date_to']) : '';
+		$where = 'WHERE 1=1';
+		$params = [];
+		if ( $method ) { $where .= ' AND method = %s'; $params[] = $method; }
+		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
+		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
+		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
+		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $q ) {
+			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
+			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
+		}
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY timestamp DESC", ...$params ), ARRAY_A );
+		if ( empty( $logs ) ) {
+			wp_send_json_error(['message'=>__('No logs found for export.','reviewboost-pro')]);
+		}
+		$filename = 'reviewboost-logs-' . date('Ymd-Hi') . '.csv';
+		headers_sent() || header( 'Content-Type: text/csv; charset=utf-8' );
+		headers_sent() || header( 'Content-Disposition: attachment; filename=' . $filename );
+		$output = fopen( 'php://output', 'w' );
+		fputcsv( $output, array_keys( $logs[0] ) );
+		foreach ( $logs as $log ) {
+			fputcsv( $output, $log );
+		}
+		fclose( $output );
+		exit;
 	}
 }
 
