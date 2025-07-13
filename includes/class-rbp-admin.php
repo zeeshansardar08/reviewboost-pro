@@ -35,6 +35,15 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_pro_multistep_reminders', [ 'sanitize_callback' => [ $this, 'sanitize_multistep_reminders' ] ] );
 		// Advanced Template Builder (Pro)
 		register_setting( 'rbp_settings', 'rbp_pro_templates', [ 'sanitize_callback' => [ $this, 'sanitize_templates' ] ] );
+		// Auto-Coupon on Review (Pro)
+		register_setting( 'rbp_settings', 'rbp_pro_enable_coupon_on_review', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_type', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_amount', [ 'sanitize_callback' => 'floatval' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_min_spend', [ 'sanitize_callback' => 'floatval' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_usage_limit', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_expiry_days', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_email_template', [ 'sanitize_callback' => 'wp_kses_post' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_coupon_log_enabled', [ 'sanitize_callback' => 'absint' ] );
 	}
 
 	/**
@@ -246,6 +255,52 @@ class RBP_Admin {
 					</td>
 					</tr>
 					<!-- End Multi-step Reminders -->
+					<tr valign="top">
+						<th scope="row" colspan="2"><strong><?php esc_html_e( 'Auto-Coupon on Review (Pro)', 'reviewboost-pro' ); ?></strong></th>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Enable Auto-Coupon', 'reviewboost-pro' ); ?></th>
+						<td><input type="checkbox" name="rbp_pro_enable_coupon_on_review" value="1" <?php checked( get_option('rbp_pro_enable_coupon_on_review', 0), 1 ); ?> /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Coupon Type', 'reviewboost-pro' ); ?></th>
+						<td>
+							<select name="rbp_pro_coupon_type">
+								<option value="fixed_cart" <?php selected( get_option('rbp_pro_coupon_type', 'fixed_cart'), 'fixed_cart' ); ?>><?php esc_html_e( 'Fixed Cart Discount', 'reviewboost-pro' ); ?></option>
+								<option value="percent" <?php selected( get_option('rbp_pro_coupon_type', 'percent'), 'percent' ); ?>><?php esc_html_e( 'Percentage Discount', 'reviewboost-pro' ); ?></option>
+								<option value="fixed_product" <?php selected( get_option('rbp_pro_coupon_type', 'fixed_product'), 'fixed_product' ); ?>><?php esc_html_e( 'Fixed Product Discount', 'reviewboost-pro' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Coupon Amount', 'reviewboost-pro' ); ?></th>
+						<td><input type="number" step="0.01" min="0.01" name="rbp_pro_coupon_amount" value="<?php echo esc_attr( get_option('rbp_pro_coupon_amount', 5) ); ?>" style="width:90px;" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Minimum Spend', 'reviewboost-pro' ); ?></th>
+						<td><input type="number" step="0.01" min="0" name="rbp_pro_coupon_min_spend" value="<?php echo esc_attr( get_option('rbp_pro_coupon_min_spend', 0) ); ?>" style="width:90px;" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Usage Limit', 'reviewboost-pro' ); ?></th>
+						<td><input type="number" min="1" name="rbp_pro_coupon_usage_limit" value="<?php echo esc_attr( get_option('rbp_pro_coupon_usage_limit', 1) ); ?>" style="width:90px;" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Expiry (days)', 'reviewboost-pro' ); ?></th>
+						<td><input type="number" min="1" name="rbp_pro_coupon_expiry_days" value="<?php echo esc_attr( get_option('rbp_pro_coupon_expiry_days', 7) ); ?>" style="width:90px;" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Coupon Email Template', 'reviewboost-pro' ); ?></th>
+						<td>
+							<textarea name="rbp_pro_coupon_email_template" rows="4" cols="70"><?php echo esc_textarea( get_option('rbp_pro_coupon_email_template', __( 'Thank you for your review! Here is your coupon code: [coupon_code]', 'reviewboost-pro' ) ) ); ?></textarea>
+							<br/>
+							<small><?php esc_html_e( 'Available merge tags:', 'reviewboost-pro' ); ?> <code>[customer_name]</code> <code>[coupon_code]</code> <code>[expiry_date]</code></small>
+						</td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Log Coupon Events', 'reviewboost-pro' ); ?></th>
+						<td><input type="checkbox" name="rbp_pro_coupon_log_enabled" value="1" <?php checked( get_option('rbp_pro_coupon_log_enabled', 1), 1 ); ?> /></td>
+					</tr>
+					<!-- End Auto-Coupon on Review -->
 				</table>
 				<h2><?php esc_html_e( 'Advanced Template Builder (Pro)', 'reviewboost-pro' ); ?></h2>
 				<div id="rbp-template-builder">
