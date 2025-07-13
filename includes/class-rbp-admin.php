@@ -49,6 +49,11 @@ class RBP_Admin {
 				'channel' => sanitize_text_field( $step['channel'] ?? '' ),
 				'subject' => sanitize_text_field( $step['subject'] ?? '' ),
 				'body'    => wp_kses_post( $step['body'] ?? '' ),
+				// Conditions
+				'order_total' => isset($step['order_total']) ? floatval($step['order_total']) : '',
+				'products'    => isset($step['products']) && is_array($step['products']) ? array_map('absint', $step['products']) : [],
+				'categories'  => isset($step['categories']) && is_array($step['categories']) ? array_map('absint', $step['categories']) : [],
+				'countries'   => isset($step['countries']) && is_array($step['countries']) ? array_map('sanitize_text_field', $step['countries']) : [],
 			];
 		}
 		return $sanitized;
@@ -138,8 +143,20 @@ class RBP_Admin {
 							<?php
 							$steps = get_option( 'rbp_pro_multistep_reminders', [] );
 							if ( empty( $steps ) ) {
-								$steps = [ [ 'days' => 3, 'channel' => 'email', 'subject' => '', 'body' => '' ] ];
+								$steps = [ [ 'days' => 3, 'channel' => 'email', 'subject' => '', 'body' => '', 'order_total' => '', 'products' => [], 'categories' => [], 'countries' => [] ] ];
 							}
+							// WooCommerce data for selects
+							$all_products = function_exists('wc_get_products') ? wc_get_products([ 'limit'=>1000, 'status'=>'publish', 'return'=>'ids' ]) : [];
+							$product_options = [];
+							foreach ( $all_products as $pid ) {
+								$product_options[$pid] = get_the_title($pid);
+							}
+							$all_categories = get_terms([ 'taxonomy'=>'product_cat', 'hide_empty'=>false ]);
+							$category_options = [];
+							foreach ( $all_categories as $cat ) {
+								$category_options[$cat->term_id] = $cat->name;
+							}
+							$all_countries = function_exists('WC') ? WC()->countries->get_countries() : [];
 							foreach ( $steps as $i => $step ) {
 								?>
 								<div class="rbp-reminder-step" style="margin-bottom:1em;padding:1em;border:1px solid #ddd;">
@@ -158,6 +175,34 @@ class RBP_Admin {
 									<br/>
 									<label><?php esc_html_e( 'Message:', 'reviewboost-pro' ); ?></label>
 									<textarea name="rbp_pro_multistep_reminders[<?php echo $i; ?>][body]" rows="3" cols="60"><?php echo esc_textarea( $step['body'] ); ?></textarea>
+									<br/>
+									<!-- Conditional fields -->
+									<fieldset style="margin-top:1em;padding:0.5em 1em;background:#f9f9f9;border:1px dashed #ccc;">
+										<legend><?php esc_html_e('Send only if:', 'reviewboost-pro'); ?></legend>
+										<label><?php esc_html_e('Order total >=', 'reviewboost-pro'); ?></label>
+										<input type="number" step="0.01" min="0" name="rbp_pro_multistep_reminders[<?php echo $i; ?>][order_total]" value="<?php echo esc_attr($step['order_total'] ?? ''); ?>" style="width:90px;" />
+										<br/>
+										<label><?php esc_html_e('Product(s):', 'reviewboost-pro'); ?></label>
+										<select name="rbp_pro_multistep_reminders[<?php echo $i; ?>][products][]" multiple style="min-width:150px;">
+											<?php foreach ($product_options as $pid=>$title): ?>
+												<option value="<?php echo esc_attr($pid); ?>" <?php if (!empty($step['products']) && in_array($pid, $step['products'])) echo 'selected'; ?>><?php echo esc_html($title); ?></option>
+											<?php endforeach; ?>
+										</select>
+										<br/>
+										<label><?php esc_html_e('Category(ies):', 'reviewboost-pro'); ?></label>
+										<select name="rbp_pro_multistep_reminders[<?php echo $i; ?>][categories][]" multiple style="min-width:150px;">
+											<?php foreach ($category_options as $cid=>$name): ?>
+												<option value="<?php echo esc_attr($cid); ?>" <?php if (!empty($step['categories']) && in_array($cid, $step['categories'])) echo 'selected'; ?>><?php echo esc_html($name); ?></option>
+											<?php endforeach; ?>
+										</select>
+										<br/>
+										<label><?php esc_html_e('Country(ies):', 'reviewboost-pro'); ?></label>
+										<select name="rbp_pro_multistep_reminders[<?php echo $i; ?>][countries][]" multiple style="min-width:150px;">
+											<?php foreach ($all_countries as $code=>$name): ?>
+												<option value="<?php echo esc_attr($code); ?>" <?php if (!empty($step['countries']) && in_array($code, $step['countries'])) echo 'selected'; ?>><?php echo esc_html($name); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</fieldset>
 								</div>
 								<?php
 							}
@@ -168,28 +213,37 @@ class RBP_Admin {
 							jQuery(document).ready(function($){
 								$('#rbp-add-reminder-step').click(function(){
 									var idx = $('#rbp-multistep-reminders .rbp-reminder-step').length;
-									var html = `<div class="rbp-reminder-step" style="margin-bottom:1em;padding:1em;border:1px solid #ddd;">
-										<label><?php esc_html_e( 'Days after completion:', 'reviewboost-pro' ); ?></label>
-										<input type="number" name="rbp_pro_multistep_reminders[`+idx+`][days]" value="3" min="1" max="60" style="width:60px;" />
-										&nbsp;
-										<label><?php esc_html_e( 'Channel:', 'reviewboost-pro' ); ?></label>
-										<select name="rbp_pro_multistep_reminders[`+idx+`][channel]">
-											<option value="email">Email</option>
-											<option value="whatsapp">WhatsApp</option>
-											<option value="sms">SMS</option>
-										</select>
-										<br/>
-										<label><?php esc_html_e( 'Subject (Email only):', 'reviewboost-pro' ); ?></label>
-										<input type="text" name="rbp_pro_multistep_reminders[`+idx+`][subject]" value="" class="regular-text" />
-										<br/>
-										<label><?php esc_html_e( 'Message:', 'reviewboost-pro' ); ?></label>
-										<textarea name="rbp_pro_multistep_reminders[`+idx+`][body]" rows="3" cols="60"></textarea>
-									</div>`;
-									$('#rbp-multistep-reminders').append(html);
-								});
+									var html = `<div class=\"rbp-reminder-step\" style=\"margin-bottom:1em;padding:1em;border:1px solid #ddd;\">`+
+										'<label><?php esc_html_e( 'Days after completion:', 'reviewboost-pro' ); ?></label>'+
+										'<input type=\"number\" name=\"rbp_pro_multistep_reminders['+idx+'][days]\" value=\"3\" min=\"1\" max=\"60\" style=\"width:60px;\" />'+
+										'&nbsp;'+
+										'<label><?php esc_html_e( 'Channel:', 'reviewboost-pro' ); ?></label>'+
+										'<select name=\"rbp_pro_multistep_reminders['+idx+'][channel]\">'+
+											'<option value=\"email\">Email</option>'+
+											'<option value=\"whatsapp\">WhatsApp</option>'+
+											'<option value=\"sms\">SMS</option>'+
+										'</select><br/>'+ 
+										'<label><?php esc_html_e( 'Subject (Email only):', 'reviewboost-pro' ); ?></label>'+
+										'<input type=\"text\" name=\"rbp_pro_multistep_reminders['+idx+'][subject]\" value=\"\" class=\"regular-text\" /><br/>'+ 
+										'<label><?php esc_html_e( 'Message:', 'reviewboost-pro' ); ?></label>'+
+										'<textarea name=\"rbp_pro_multistep_reminders['+idx+'][body]\" rows=\"3\" cols=\"60\"></textarea><br/>'+ 
+										'<fieldset style=\"margin-top:1em;padding:0.5em 1em;background:#f9f9f9;border:1px dashed #ccc;\">'+
+											'<legend><?php esc_html_e('Send only if:', 'reviewboost-pro'); ?></legend>'+
+											'<label><?php esc_html_e('Order total >=', 'reviewboost-pro'); ?></label>'+
+											'<input type=\"number\" step=\"0.01\" min=\"0\" name=\"rbp_pro_multistep_reminders['+idx+'][order_total]\" value=\"\" style=\"width:90px;\" /><br/>'+ 
+											'<label><?php esc_html_e('Product(s):', 'reviewboost-pro'); ?></label>'+
+											'<select name=\"rbp_pro_multistep_reminders['+idx+'][products][]\" multiple style=\"min-width:150px;\"><?php foreach ($product_options as $pid=>$title): ?><option value=\"<?php echo esc_attr($pid); ?>\"><?php echo esc_html($title); ?></option><?php endforeach; ?></select><br/>'+ 
+											'<label><?php esc_html_e('Category(ies):', 'reviewboost-pro'); ?></label>'+
+											'<select name=\"rbp_pro_multistep_reminders['+idx+'][categories][]\" multiple style=\"min-width:150px;\"><?php foreach ($category_options as $cid=>$name): ?><option value=\"<?php echo esc_attr($cid); ?>\"><?php echo esc_html($name); ?></option><?php endforeach; ?></select><br/>'+ 
+											'<label><?php esc_html_e('Country(ies):', 'reviewboost-pro'); ?></label>'+
+											'<select name=\"rbp_pro_multistep_reminders['+idx+'][countries][]\" multiple style=\"min-width:150px;\"><?php foreach ($all_countries as $code=>$name): ?><option value=\"<?php echo esc_attr($code); ?>\"><?php echo esc_html($name); ?></option><?php endforeach; ?></select>'+ 
+										'</fieldset>'+ 
+									'</div>';
+								$('#rbp-multistep-reminders').append(html);
 							});
-							</script>
-						</td>
+						});
+						</script>
+					</td>
 					</tr>
 					<!-- End Multi-step Reminders -->
 				</table>
