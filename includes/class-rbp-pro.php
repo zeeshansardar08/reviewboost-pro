@@ -104,29 +104,83 @@ class RBP_Pro {
         // Prevent duplicate sends
         $meta_key = '_rbp_multistep_sent_' . $step_idx . '_' . $channel;
         if ( get_post_meta( $order_id, $meta_key, true ) ) return;
-        // Send via the selected channel
+        // Use advanced template if available
+        $tpl = get_option('rbp_pro_templates', []);
         if ( $channel === 'email' ) {
+            $email_tpl = $tpl['email'] ?? [];
             $subject = $step['subject'] ?: __( 'We’d love your review!', 'reviewboost-pro' );
-            $body = $step['body'] ?: __( 'Please review your order.', 'reviewboost-pro' );
+            $header = $email_tpl['header'] ?? '';
+            $body = $step['body'] ?: ( $email_tpl['body'] ?? '' );
+            $footer = $email_tpl['footer'] ?? '';
+            $button = $email_tpl['button'] ?? '';
             // Merge tags
             $merge_tags = [
                 '[customer_name]' => esc_html( $order->get_billing_first_name() ),
                 '[order_id]'      => $order->get_id(),
+                '[product_list]'  => $this->get_product_list( $order ),
+                '[review_url]'    => $this->get_review_url( $order ),
             ];
             foreach ( $merge_tags as $tag => $value ) {
                 $subject = str_replace( $tag, $value, $subject );
+                $header = str_replace( $tag, $value, $header );
                 $body = str_replace( $tag, $value, $body );
+                $footer = str_replace( $tag, $value, $footer );
+                $button = str_replace( $tag, $value, $button );
             }
+            $email_content = $header . '<br>' . $body;
+            if ( $button ) {
+                $email_content .= '<br><a href="' . esc_url( $merge_tags['[review_url]'] ) . '" style="display:inline-block;background:#3c8dbc;color:#fff;padding:10px 20px;text-decoration:none;border-radius:4px;">' . $button . '</a>';
+            }
+            $email_content .= '<br>' . $footer;
             $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
-            wp_mail( $order->get_billing_email(), $subject, $body, $headers );
+            wp_mail( $order->get_billing_email(), $subject, $email_content, $headers );
         } elseif ( $channel === 'whatsapp' ) {
-            // TODO: Implement WhatsApp sending
+            $wa_tpl = $tpl['whatsapp']['body'] ?? '';
+            $msg = $step['body'] ?: $wa_tpl;
+            $merge_tags = [
+                '[customer_name]' => esc_html( $order->get_billing_first_name() ),
+                '[order_id]'      => $order->get_id(),
+                '[review_url]'    => $this->get_review_url( $order ),
+            ];
+            foreach ( $merge_tags as $tag => $value ) {
+                $msg = str_replace( $tag, $value, $msg );
+            }
+            // TODO: Send WhatsApp message
         } elseif ( $channel === 'sms' ) {
-            // TODO: Implement SMS sending
+            $sms_tpl = $tpl['sms']['body'] ?? '';
+            $msg = $step['body'] ?: $sms_tpl;
+            $merge_tags = [
+                '[customer_name]' => esc_html( $order->get_billing_first_name() ),
+                '[order_id]'      => $order->get_id(),
+                '[review_url]'    => $this->get_review_url( $order ),
+            ];
+            foreach ( $merge_tags as $tag => $value ) {
+                $msg = str_replace( $tag, $value, $msg );
+            }
+            // TODO: Send SMS message
         }
         update_post_meta( $order_id, $meta_key, 1 );
         // Log event
         RBP_Logger::log_event( $order_id, $order->get_customer_id(), $channel, current_time( 'mysql' ), 'sent', 0 );
+    }
+
+    /**
+     * Get product list as string
+     */
+    private function get_product_list( $order ) {
+        $names = [];
+        foreach ( $order->get_items() as $item ) {
+            $names[] = $item->get_name();
+        }
+        return implode( ', ', $names );
+    }
+
+    /**
+     * Get review URL for order (default: My Account > Orders)
+     */
+    private function get_review_url( $order ) {
+        // TODO: Support per-product review links or external URLs
+        return wc_get_endpoint_url( 'orders', '', wc_get_page_permalink( 'myaccount' ) );
     }
 }
 
