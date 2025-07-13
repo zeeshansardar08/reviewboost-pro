@@ -23,6 +23,14 @@ class RBP_Admin {
 		register_setting( 'rbp_settings', 'rbp_reminder_body', [ 'sanitize_callback' => 'wp_kses_post' ] );
 		register_setting( 'rbp_settings', 'rbp_reminder_delay_days', [ 'sanitize_callback' => 'absint' ] );
 		register_setting( 'rbp_settings', 'rbp_enabled', [ 'sanitize_callback' => 'absint' ] );
+		// Pro fields
+		register_setting( 'rbp_settings', 'rbp_pro_enable_whatsapp', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_whatsapp_api_key', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_enable_sms', [ 'sanitize_callback' => 'absint' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_sms_provider', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_sms_sid', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_sms_token', [ 'sanitize_callback' => 'sanitize_text_field' ] );
+		register_setting( 'rbp_settings', 'rbp_pro_sms_from', [ 'sanitize_callback' => 'sanitize_text_field' ] );
 	}
 
 	public function render_settings_page() {
@@ -50,9 +58,46 @@ class RBP_Admin {
 							wp_editor( get_option( 'rbp_reminder_body', __( 'Hi [customer_name],<br><br>Thank you for your purchase! Please leave a review for your order #[order_id].', 'reviewboost-pro' ) ), 'rbp_reminder_body', [ 'textarea_name' => 'rbp_reminder_body', 'media_buttons' => false, 'textarea_rows' => 8 ] );
 						?></td>
 					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Enable WhatsApp Reminders', 'reviewboost-pro' ); ?></th>
+						<td><input type="checkbox" name="rbp_pro_enable_whatsapp" value="1" <?php checked( 1, get_option( 'rbp_pro_enable_whatsapp', 0 ) ); ?> /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'WhatsApp API Key', 'reviewboost-pro' ); ?></th>
+						<td><input type="text" name="rbp_pro_whatsapp_api_key" value="<?php echo esc_attr( get_option( 'rbp_pro_whatsapp_api_key', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'Enable SMS Reminders', 'reviewboost-pro' ); ?></th>
+						<td><input type="checkbox" name="rbp_pro_enable_sms" value="1" <?php checked( 1, get_option( 'rbp_pro_enable_sms', 0 ) ); ?> /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'SMS Provider', 'reviewboost-pro' ); ?></th>
+						<td>
+							<select name="rbp_pro_sms_provider">
+								<option value="twilio" <?php selected( get_option( 'rbp_pro_sms_provider', 'twilio' ), 'twilio' ); ?>>Twilio</option>
+								<option value="nexmo" <?php selected( get_option( 'rbp_pro_sms_provider', 'twilio' ), 'nexmo' ); ?>>Nexmo</option>
+							</select> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?>
+						</td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'SMS API SID', 'reviewboost-pro' ); ?></th>
+						<td><input type="text" name="rbp_pro_sms_sid" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_sid', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'SMS API Token', 'reviewboost-pro' ); ?></th>
+						<td><input type="text" name="rbp_pro_sms_token" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_token', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row"><?php esc_html_e( 'SMS From Number', 'reviewboost-pro' ); ?></th>
+						<td><input type="text" name="rbp_pro_sms_from" value="<?php echo esc_attr( get_option( 'rbp_pro_sms_from', '' ) ); ?>" class="regular-text" /> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
+					</tr>
 				</table>
 				<?php submit_button(); ?>
 			</form>
+
+			<hr />
+			<h2><?php esc_html_e( 'Recent Reminder Log', 'reviewboost-pro' ); ?></h2>
+			<!-- Log table ... -->
 		</div>
 		<?php
 	}
