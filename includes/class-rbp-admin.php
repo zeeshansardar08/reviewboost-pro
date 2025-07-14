@@ -36,16 +36,6 @@ class RBP_Admin {
 		);
 	}
 
-	public function add_coupon_logs_dashboard_menu() {
-		add_submenu_page(
-			'woocommerce',
-			__( 'ReviewBoost Coupon Logs', 'reviewboost-pro' ),
-			__( 'Coupon Logs', 'reviewboost-pro' ),
-			'manage_woocommerce',
-			'rbp-coupon-logs',
-			[ $this, 'render_coupon_logs_dashboard' ]
-		);
-	}
 
 	public function register_settings() {
 		register_setting( 'rbp_settings', 'rbp_reminder_subject', [ 'sanitize_callback' => 'sanitize_text_field' ] );
