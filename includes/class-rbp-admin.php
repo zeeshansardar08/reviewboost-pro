@@ -11,6 +11,7 @@ class RBP_Admin {
 		add_action('admin_menu', [ $this, 'add_getting_started_page' ]);
 		add_action('admin_init', [ $this, 'maybe_redirect_to_getting_started' ]);
 		add_action('admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ]);
+		add_action('admin_menu', [ $this, 'add_coupon_logs_dashboard_menu' ]);
 	}
 
 	public function add_settings_page() {
@@ -32,6 +33,17 @@ class RBP_Admin {
 			'manage_woocommerce',
 			'rbp-pro-logs',
 			[ $this, 'render_logs_dashboard' ]
+		);
+	}
+
+	public function add_coupon_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Coupon Logs', 'reviewboost-pro' ),
+			__( 'Coupon Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-coupon-logs',
+			[ $this, 'render_coupon_logs_dashboard' ]
 		);
 	}
 
@@ -434,6 +446,40 @@ class RBP_Admin {
 		}
 		global $wpdb;
 		$table = $wpdb->prefix . 'reviewboost_logs';
+		// Coupon analytics summary
+		$coupon_args = [
+			'post_type' => 'shop_coupon',
+			'posts_per_page' => -1,
+			'meta_query' => [
+				[
+					'key' => '_rbp_coupon_for_review',
+					'compare' => 'EXISTS',
+				]
+			]
+		];
+		$coupons = get_posts( $coupon_args );
+		$total_coupons = count($coupons);
+		$total_redeemed = 0;
+		$total_expired = 0;
+		$total_active = 0;
+		$now = current_time('timestamp');
+		foreach ( $coupons as $coupon ) {
+			$usage_count = intval( get_post_meta( $coupon->ID, 'usage_count', true ) );
+			$date_expires = get_post_meta( $coupon->ID, 'date_expires', true );
+			if ( $usage_count > 0 ) {
+				$total_redeemed++;
+			} elseif ( $date_expires && strtotime($date_expires) < $now ) {
+				$total_expired++;
+			} else {
+				$total_active++;
+			}
+		}
+		echo '<div style="margin-bottom:24px;padding:16px;border:1px solid #e2e2e2;background:#fafafa;display:flex;gap:32px;align-items:center;border-radius:8px;">';
+		echo '<div><strong>' . esc_html__('Coupons Generated','reviewboost-pro') . ':</strong> ' . intval($total_coupons) . '</div>';
+		echo '<div><strong>' . esc_html__('Active','reviewboost-pro') . ':</strong> ' . intval($total_active) . '</div>';
+		echo '<div><strong>' . esc_html__('Redeemed','reviewboost-pro') . ':</strong> ' . intval($total_redeemed) . '</div>';
+		echo '<div><strong>' . esc_html__('Expired','reviewboost-pro') . ':</strong> ' . intval($total_expired) . '</div>';
+		echo '</div>';
 		// Filters (existing code)
 		$method = isset($_GET['method']) ? sanitize_text_field($_GET['method']) : '';
 		$status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
@@ -475,9 +521,9 @@ class RBP_Admin {
 			headers_sent() || header('Content-Type: text/csv');
 			headers_sent() || header('Content-Disposition: attachment; filename=reviewboost-logs.csv');
 			$out = fopen('php://output', 'w');
-			fputcsv($out, ['Date','Order ID','Customer ID','Method','Status','Retry','Details']);
+			fputcsv($out, ['Date','Order ID','Customer ID','Method','Status','Retry','Details', 'Coupon Status']);
 			foreach ($logs as $log) {
-				fputcsv($out, [ $log['timestamp'], $log['order_id'], $log['customer_id'], $log['method'], $log['status'], $log['retry_count'], $log['details'] ]);
+				fputcsv($out, [ $log['timestamp'], $log['order_id'], $log['customer_id'], $log['method'], $log['status'], $log['retry_count'], $log['details'], $this->get_coupon_status($log) ]);
 			}
 			fclose($out); exit;
 		}
@@ -528,9 +574,10 @@ class RBP_Admin {
 					<th><?php esc_html_e('Retry','reviewboost-pro'); ?></th>
 					<th><?php esc_html_e('Consent','reviewboost-pro'); ?></th>
 					<th><?php esc_html_e('Details','reviewboost-pro'); ?></th>
+					<th><?php esc_html_e('Coupon Status','reviewboost-pro'); ?></th>
 				</tr></thead>
 				<tbody>
-				<?php if (empty($logs)): ?><tr><td colspan="8"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
+				<?php if (empty($logs)): ?><tr><td colspan="9"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
 				<?php foreach($logs as $log): ?>
 				<tr class="rbp-log-row" data-log='<?php echo esc_attr(json_encode($log)); ?>' style="cursor:pointer;<?php if($log->status=='failed') echo 'background:#ffeaea;'; elseif($log->retry_count>0) echo 'background:#fffbe5;'; ?>">
 					<td><?php echo esc_html($log->timestamp); ?></td>
@@ -541,6 +588,7 @@ class RBP_Admin {
 					<td><?php echo esc_html($log->retry_count); ?></td>
 					<td><?php echo esc_html(get_post_meta($log->order_id, '_rbp_gdpr_consent', true)==='yes'?__('Yes','reviewboost-pro'):__('No','reviewboost-pro')); ?></td>
 					<td><pre style="white-space:pre-wrap;word-break:break-all;"><?php echo esc_html($log->details); ?></pre></td>
+					<td><?php echo $this->get_coupon_status($log); ?></td>
 				</tr>
 				<?php endforeach; ?>
 				<?php endif; ?>
@@ -589,6 +637,39 @@ class RBP_Admin {
 		<?php
 	}
 
+	public function get_coupon_status($log) {
+		if ($log->method === 'coupon') {
+			$details = is_array($log->details) ? $log->details : json_decode($log->details, true);
+			$coupon_code = '';
+			if (is_array($details) && isset($details['coupon_code'])) {
+				$coupon_code = $details['coupon_code'];
+			} elseif (is_string($log->details) && preg_match('/[A-Z0-9\-_]{6,}/', $log->details, $m)) {
+				$coupon_code = $m[0]; // fallback: extract code
+			}
+			if ($coupon_code) {
+				$coupon_id = wc_get_coupon_id_by_code($coupon_code);
+				if ($coupon_id) {
+					$usage_count = intval(get_post_meta($coupon_id, 'usage_count', true));
+					$date_expires = get_post_meta($coupon_id, 'date_expires', true);
+					$now = strtotime(date('Y-m-d'));
+					if ($usage_count > 0) {
+						return '<span style="color:#388e3c;font-weight:bold;">' . esc_html__('Redeemed','reviewboost-pro') . '</span>';
+					} elseif ($date_expires && strtotime($date_expires) < $now) {
+						return '<span style="color:#d32f2f;font-weight:bold;">' . esc_html__('Expired','reviewboost-pro') . '</span>';
+					} else {
+						return '<span style="color:#1976d2;font-weight:bold;">' . esc_html__('Active','reviewboost-pro') . '</span>';
+					}
+				} else {
+					return esc_html__('Not found','reviewboost-pro');
+				}
+			} else {
+				return esc_html__('N/A','reviewboost-pro');
+			}
+		} else {
+			return '&mdash;';
+		}
+	}
+
 	/**
 	 * AJAX handler for logs table
 	 */
@@ -628,7 +709,7 @@ class RBP_Admin {
 		}
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ), ARRAY_A );
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
 		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(timestamp) FROM $table $where", ...$params ) );
 		$method_counts = $wpdb->get_results( $wpdb->prepare( "SELECT method, COUNT(*) as count FROM $table $where GROUP BY method", ...$params ), ARRAY_A );
@@ -653,7 +734,7 @@ class RBP_Admin {
 	 * AJAX handler for exporting logs as CSV
 	 */
 	public function ajax_export_logs() {
-		if ( ! current_user_can( 'manage_woocommerce' ) || ! check_ajax_referer('rbp_logs_dashboard','nonce', false) ) {
+		if ( ! current_user_can( 'manage_woocommerce' ) || ! check_ajax_referer('rbp_export_logs') ) {
 			wp_send_json_error(['message'=>__('Unauthorized','reviewboost-pro')]);
 		}
 		global $wpdb;
@@ -776,6 +857,165 @@ class RBP_Admin {
 			}
 		}
 	}
+
+	/**
+	 * Add Coupon Logs Dashboard submenu
+	 */
+	public function add_coupon_logs_dashboard_menu() {
+		add_submenu_page(
+			'woocommerce',
+			__( 'ReviewBoost Coupon Logs', 'reviewboost-pro' ),
+			__( 'Coupon Logs', 'reviewboost-pro' ),
+			'manage_woocommerce',
+			'rbp-coupon-logs',
+			[ $this, 'render_coupon_logs_dashboard' ]
+		);
+	}
+
+	/**
+	 * Render the Coupon Logs Dashboard page (skeleton for now)
+	 */
+	public function render_coupon_logs_dashboard() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'reviewboost-pro' ) );
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'reviewboost_logs';
+		$event_types = ['generated','sent','redeemed','expired'];
+		// Filters
+		$event = isset($_GET['event']) ? sanitize_text_field($_GET['event']) : '';
+		$status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
+		$customer = isset($_GET['customer']) ? sanitize_text_field($_GET['customer']) : '';
+		$coupon_code = isset($_GET['coupon_code']) ? sanitize_text_field($_GET['coupon_code']) : '';
+		$date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
+		$date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
+		$page = isset($_GET['paged']) ? max(1, absint($_GET['paged'])) : 1;
+		$per_page = 20;
+		$where = "WHERE method = 'coupon'";
+		$params = [];
+		if ( $event ) { $where .= ' AND status = %s'; $params[] = $event; }
+		if ( $customer ) { $where .= ' AND customer_id = %s'; $params[] = $customer; }
+		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		// Coupon code filter (in details JSON)
+		if ( $coupon_code ) {
+			$where .= " AND details LIKE %s";
+			$params[] = '%' . $coupon_code . '%';
+		}
+		// Analytics summary
+		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, ".
+			"SUM(status='generated') as generated, ".
+			"SUM(status='sent') as sent, ".
+			"SUM(status='redeemed') as redeemed, ".
+			"SUM(status='expired') as expired ".
+			"FROM $table $where", ...$params ), ARRAY_A );
+		// Query logs
+		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
+		$offset = ( $page - 1 ) * $per_page;
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		// CSV export
+		if ( isset($_GET['export_coupon_csv']) && check_admin_referer('rbp_export_coupon_logs') ) {
+			$all_logs = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM $table $where ORDER BY timestamp DESC",
+				...$params
+			) );
+			headers_sent() || header('Content-Type: text/csv');
+			headers_sent() || header('Content-Disposition: attachment; filename=reviewboost-coupon-logs.csv');
+			$out = fopen('php://output', 'w');
+			fputcsv($out, ['Date','Customer ID','Event','Coupon Code','Order/Review ID','Status','Details']);
+			foreach ($all_logs as $log) {
+				$details = is_array($log->details) ? $log->details : json_decode($log->details, true);
+				$coupon_code = is_array($details) && isset($details['coupon_code']) ? $details['coupon_code'] : '';
+				$review_id = is_array($details) && isset($details['review_id']) ? $details['review_id'] : '';
+				fputcsv($out, [ $log->timestamp, $log->customer_id, $log->status, $coupon_code, $review_id, $this->get_coupon_status($log), $log->details ]);
+			}
+			fclose($out); exit;
+		}
+		// UI
+		echo '<div class="wrap">';
+		echo '<h1>' . esc_html__('ReviewBoost Coupon Logs','reviewboost-pro') . '</h1>';
+		// Analytics summary
+		echo '<div style="margin-bottom:24px;padding:16px;border:1px solid #e2e2e2;background:#fafafa;display:flex;gap:32px;align-items:center;border-radius:8px;">';
+		echo '<div><strong>' . esc_html__('Total','reviewboost-pro') . ':</strong> ' . intval($stats['total']) . '</div>';
+		echo '<div><strong>' . esc_html__('Generated','reviewboost-pro') . ':</strong> ' . intval($stats['generated']) . '</div>';
+		echo '<div><strong>' . esc_html__('Sent','reviewboost-pro') . ':</strong> ' . intval($stats['sent']) . '</div>';
+		echo '<div><strong>' . esc_html__('Redeemed','reviewboost-pro') . ':</strong> ' . intval($stats['redeemed']) . '</div>';
+		echo '<div><strong>' . esc_html__('Expired','reviewboost-pro') . ':</strong> ' . intval($stats['expired']) . '</div>';
+		echo '</div>';
+		// Filters
+		echo '<form method="get" style="margin:18px 0;display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;">';
+		echo '<input type="hidden" name="page" value="rbp-coupon-logs" />';
+		echo '<label>' . esc_html__('Event','reviewboost-pro') . ': <select name="event"><option value="">' . esc_html__('All','reviewboost-pro') . '</option>';
+		foreach($event_types as $e) {
+			echo '<option value="' . esc_attr($e) . '"' . selected($e,$event,false) . '>' . esc_html(ucfirst($e)) . '</option>';
+		}
+		echo '</select></label>';
+		echo '<label>' . esc_html__('Status','reviewboost-pro') . ': <select name="status"><option value="">' . esc_html__('All','reviewboost-pro') . '</option>';
+		echo '<option value="active"' . selected($status,'active',false) . '>' . esc_html__('Active','reviewboost-pro') . '</option>';
+		echo '<option value="redeemed"' . selected($status,'redeemed',false) . '>' . esc_html__('Redeemed','reviewboost-pro') . '</option>';
+		echo '<option value="expired"' . selected($status,'expired',false) . '>' . esc_html__('Expired','reviewboost-pro') . '</option>';
+		echo '</select></label>';
+		echo '<label>' . esc_html__('Customer ID','reviewboost-pro') . ': <input type="text" name="customer" value="' . esc_attr($customer) . '" /></label>';
+		echo '<label>' . esc_html__('Coupon Code','reviewboost-pro') . ': <input type="text" name="coupon_code" value="' . esc_attr($coupon_code) . '" /></label>';
+		echo '<label>' . esc_html__('From','reviewboost-pro') . ': <input type="date" name="date_from" value="' . esc_attr($date_from) . '" /></label>';
+		echo '<label>' . esc_html__('To','reviewboost-pro') . ': <input type="date" name="date_to" value="' . esc_attr($date_to) . '" /></label>';
+		echo '<button type="submit" class="button">' . esc_html__('Filter','reviewboost-pro') . '</button>';
+		wp_nonce_field('rbp_export_coupon_logs');
+		echo '<button type="submit" name="export_coupon_csv" value="1" class="button button-secondary">' . esc_html__('Export CSV','reviewboost-pro') . '</button>';
+		echo '</form>';
+		// Logs table
+		echo '<table class="widefat striped" style="margin-top:1em;">';
+		echo '<thead><tr>';
+		echo '<th>' . esc_html__('Date','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Customer ID','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Event','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Coupon Code','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Order/Review ID','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Status','reviewboost-pro') . '</th>';
+		echo '<th>' . esc_html__('Details','reviewboost-pro') . '</th>';
+		echo '</tr></thead><tbody>';
+		if (empty($logs)) {
+			echo '<tr><td colspan="7">' . esc_html__('No logs found.','reviewboost-pro') . '</td></tr>';
+		} else {
+			foreach($logs as $log) {
+				$details = is_array($log->details) ? $log->details : json_decode($log->details, true);
+				$coupon_code = is_array($details) && isset($details['coupon_code']) ? $details['coupon_code'] : '';
+				$review_id = is_array($details) && isset($details['review_id']) ? $details['review_id'] : '';
+				// Status filter (active, redeemed, expired)
+				$row_status = $this->get_coupon_status($log);
+				if ($status) {
+					$plain = strtolower(strip_tags($row_status));
+					if ($plain !== $status) continue;
+				}
+				echo '<tr>';
+				echo '<td>' . esc_html($log->timestamp) . '</td>';
+				echo '<td>' . esc_html($log->customer_id) . '</td>';
+				echo '<td>' . esc_html(ucfirst($log->status)) . '</td>';
+				echo '<td>' . esc_html($coupon_code) . '</td>';
+				echo '<td>' . esc_html($review_id) . '</td>';
+				echo '<td>' . $row_status . '</td>';
+				echo '<td><pre style="white-space:pre-wrap;word-break:break-all;">' . esc_html(is_string($log->details) ? $log->details : json_encode($log->details)) . '</pre></td>';
+				echo '</tr>';
+			}
+		}
+		echo '</tbody></table>';
+		// Pagination
+		$total_pages = ceil($total/$per_page);
+		if ( $total_pages > 1 ) {
+			$page_base = remove_query_arg('paged');
+			echo '<div class="tablenav"><span class="pagination-links">';
+			for ( $p = 1; $p <= $total_pages; $p++ ) {
+				if ( $p == $page ) {
+					echo '<span class="tablenav-pages-navspan">' . $p . '</span> ';
+				} else {
+					echo '<a href="' . esc_url(add_query_arg('paged', $p, $page_base)) . '">' . $p . '</a> ';
+				}
+			}
+			echo '</span></div>';
+		}
+		echo '</div>';
+	}
+
 }
 
 // Initialize admin
