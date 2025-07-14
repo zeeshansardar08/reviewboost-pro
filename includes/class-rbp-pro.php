@@ -403,58 +403,44 @@ class RBP_Pro {
             if ( $user ) $customer_id = $user->ID;
         }
         if ( ! $customer_id ) return;
-        // Generate coupon
-        $coupon_code = $this->generate_unique_coupon_code( $customer_id, $comment_ID );
-        $expiry_days = absint( get_option('rbp_pro_coupon_expiry_days', 7) );
-        $expiry_date = date( 'Y-m-d', strtotime( "+$expiry_days days" ) );
-        $coupon_args = [
-            'post_title'   => $coupon_code,
-            'post_content' => '',
-            'post_status'  => 'publish',
-            'post_author'  => 1,
-            'post_type'    => 'shop_coupon',
+        // Gather review context for rules
+        $rating = 0;
+        if ( isset( $commentdata['comment_post_ID'] ) ) {
+            $rating = intval( get_comment_meta( $comment_ID, 'rating', true ) );
+        }
+        $order_total = 0;
+        // Optionally, find order total if available (customize as needed)
+        // $order_total = ...
+        $context = [
+            'rating' => $rating,
+            'order_total' => $order_total,
+            'order_id' => $post_id,
+            'user_id' => $customer_id,
+            'review_id' => $comment_ID,
         ];
-        $coupon_id = wp_insert_post( $coupon_args );
+        $manager = RBP_Coupon_Manager::instance();
+        if ( ! $manager->evaluate_coupon_rules( $context ) ) return;
+        // Generate coupon code
+        $coupon_code = $manager->generate_unique_coupon_code( $customer_id, $comment_ID );
+        // Create coupon
+        $coupon_id = $manager->create_coupon( $coupon_code, [
+            '_rbp_coupon_for_review' => $comment_ID,
+            '_rbp_coupon_for_user' => $customer_id,
+        ] );
         if ( ! $coupon_id ) return;
-        update_post_meta( $coupon_id, 'discount_type', get_option('rbp_pro_coupon_type', 'fixed_cart') );
-        update_post_meta( $coupon_id, 'coupon_amount', get_option('rbp_pro_coupon_amount', 5) );
-        update_post_meta( $coupon_id, 'minimum_amount', get_option('rbp_pro_coupon_min_spend', 0) );
-        update_post_meta( $coupon_id, 'usage_limit', get_option('rbp_pro_coupon_usage_limit', 1) );
-        update_post_meta( $coupon_id, 'date_expires', $expiry_date );
-        update_post_meta( $coupon_id, '_rbp_coupon_for_review', $comment_ID );
-        update_post_meta( $coupon_id, '_rbp_coupon_for_user', $customer_id );
         // Mark review as coupon sent
         update_comment_meta( $comment_ID, '_rbp_coupon_sent', $coupon_code );
         // Send coupon to customer
-        $this->send_coupon_to_customer( $coupon_code, $customer_id, $email, $expiry_date );
+        $expiry_days = absint( get_option('rbp_pro_coupon_expiry_days', 7) );
+        $expiry_date = date( 'Y-m-d', strtotime( "+$expiry_days days" ) );
+        $manager->send_coupon_to_customer( $coupon_code, $customer_id, $email, $expiry_date );
         // Log event
-        if ( get_option('rbp_pro_coupon_log_enabled', 1) ) {
-            RBP_Logger::log_event( 0, $customer_id, 'coupon', current_time( 'mysql' ), 'generated', 0, [ 'coupon_code' => $coupon_code, 'review_id' => $comment_ID ] );
-        }
+        $manager->log_coupon_event( $customer_id, 'generated', [ 'coupon_code' => $coupon_code, 'review_id' => $comment_ID ] );
     }
 
     /**
-     * Generate a unique coupon code
+     * Show license required notice
      */
-    private function generate_unique_coupon_code( $user_id, $review_id ) {
-        $prefix = 'RBP-';
-        $rand = strtoupper( wp_generate_password( 6, false, false ) );
-        return $prefix . $user_id . '-' . $rand . '-' . $review_id;
-    }
-
-    /**
-     * Send coupon to customer (email, stub for WhatsApp/SMS)
-     */
-    private function send_coupon_to_customer( $coupon_code, $user_id, $email, $expiry_date ) {
-        $user = get_userdata( $user_id );
-        $customer_name = $user ? $user->display_name : '';
-        $tpl = get_option('rbp_pro_coupon_email_template', __( 'Thank you for your review! Here is your coupon code: [coupon_code]', 'reviewboost-pro' ) );
-        $body = str_replace( [ '[customer_name]', '[coupon_code]', '[expiry_date]' ], [ $customer_name, $coupon_code, $expiry_date ], $tpl );
-        $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
-        wp_mail( $email, __( 'Your Coupon for Reviewing', 'reviewboost-pro' ), $body, $headers );
-        // TODO: WhatsApp/SMS delivery if enabled
-    }
-
     public function show_license_required_notice() {
         if ( ! current_user_can('manage_options') ) return;
         $upgrade_url = 'https://your-upgrade-page.com'; // TODO: Replace with your real upgrade/pricing page
