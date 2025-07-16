@@ -520,7 +520,7 @@ class RBP_Admin {
 		// Pagination (existing code)
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		// Get unique methods/status for filters
 		$methods = $wpdb->get_col( "SELECT DISTINCT method FROM $table ORDER BY method" );
 		$statuses = $wpdb->get_col( "SELECT DISTINCT status FROM $table ORDER BY status" );
@@ -699,7 +699,7 @@ class RBP_Admin {
 		}
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
 		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(time_sent) FROM $table $where", ...$params ) );
 		$method_counts = $wpdb->get_results( $wpdb->prepare( "SELECT method, COUNT(*) as count FROM $table $where GROUP BY method", ...$params ), ARRAY_A );
@@ -902,7 +902,7 @@ class RBP_Admin {
 		// Query logs
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		// CSV export
 		if ( isset($_GET['export_coupon_csv']) && check_admin_referer('rbp_export_coupon_logs') ) {
 			$all_logs = $wpdb->get_results( $wpdb->prepare(
