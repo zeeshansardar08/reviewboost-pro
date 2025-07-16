@@ -18,7 +18,39 @@
  */
 
 // Load Freemius SDK and initialize before anything else
-require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-freemius.php';
+// require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-freemius.php';
+
+if ( ! function_exists( 'rbp_fs' ) ) {
+    // Create a helper function for easy SDK access.
+    function rbp_fs() {
+        global $rbp_fs;
+
+        if ( ! isset( $rbp_fs ) ) {
+            // Include Freemius SDK.
+            require_once dirname( __FILE__ ) . '/freemius/start.php';
+            $rbp_fs = fs_dynamic_init( array(
+                'id'                  => '19869',
+                'slug'                => 'review-booster-pro',
+                'type'                => 'plugin',
+                'public_key'          => 'pk_8e10271b6efd64ed441eb0063aad2',
+                'is_premium'          => false,
+                'has_addons'          => false,
+                'has_paid_plans'      => false,
+                'menu'                => array(
+                    'account'        => false,
+                    'support'        => false,
+                ),
+            ) );
+        }
+
+        return $rbp_fs;
+    }
+
+    // Init Freemius.
+    rbp_fs();
+    // Signal that SDK was initiated.
+    do_action( 'rbp_fs_loaded' );
+}
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.

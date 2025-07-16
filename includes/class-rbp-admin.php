@@ -486,8 +486,8 @@ class RBP_Admin {
 		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
 		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
 		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
-		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
-		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $date_from ) { $where .= ' AND time_sent >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND time_sent <= %s'; $params[] = $date_to . ' 23:59:59'; }
 		if ( $q ) {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
@@ -500,12 +500,12 @@ class RBP_Admin {
 		}
 		// --- Analytics summary ---
 		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
-		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(timestamp) FROM $table $where", ...$params ) );
+		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(time_sent) FROM $table $where", ...$params ) );
 		// --- End analytics ---
 		// Export to CSV (existing code)
 		if ( isset($_GET['export_csv']) && check_admin_referer('rbp_export_logs') ) {
 			$logs = $wpdb->get_results( $wpdb->prepare(
-				"SELECT * FROM $table $where ORDER BY timestamp DESC",
+				"SELECT * FROM $table $where ORDER BY time_sent DESC",
 				...$params
 			), ARRAY_A );
 			headers_sent() || header('Content-Type: text/csv');
@@ -513,14 +513,14 @@ class RBP_Admin {
 			$out = fopen('php://output', 'w');
 			fputcsv($out, ['Date','Order ID','Customer ID','Method','Status','Retry','Details', 'Coupon Status']);
 			foreach ($logs as $log) {
-				fputcsv($out, [ $log['timestamp'], $log['order_id'], $log['customer_id'], $log['method'], $log['status'], $log['retry_count'], $log['details'], $this->get_coupon_status($log) ]);
+				fputcsv($out, [ $log['time_sent'], $log['order_id'], $log['customer_id'], $log['method'], $log['status'], $log['retry_count'], $log['details'], $this->get_coupon_status($log) ]);
 			}
 			fclose($out); exit;
 		}
 		// Pagination (existing code)
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		// Get unique methods/status for filters
 		$methods = $wpdb->get_col( "SELECT DISTINCT method FROM $table ORDER BY method" );
 		$statuses = $wpdb->get_col( "SELECT DISTINCT status FROM $table ORDER BY status" );
@@ -529,7 +529,7 @@ class RBP_Admin {
 			<h1><?php esc_html_e( 'ReviewBoost Pro Logs', 'reviewboost-pro' ); ?></h1>
 			<p><?php esc_html_e( 'View and export all reminder and coupon events.', 'reviewboost-pro' ); ?></p>
 			<!-- Analytics summary -->
-			<div class="rbp-logs-analytics" style="margin-bottom:20px;background:#f9f9f9;border:1px solid #e1e1e1;padding:12px 18px;display:flex;gap:32px;align-items:center;">
+			<div class="rbp-logs-analytics" style="margin-bottom:20px;background:#f9f9f9;border:1px solid #e1e1e1;padding:12px 18px;display:flex;gap:32px;align-items:center;border-radius:8px;">
 				<div><strong><?php esc_html_e('Total','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['total']); ?></div>
 				<div><strong><?php esc_html_e('Sent','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['sent']); ?></div>
 				<div><strong><?php esc_html_e('Failed','reviewboost-pro'); ?>:</strong> <?php echo intval($stats['failed']); ?></div>
@@ -570,7 +570,7 @@ class RBP_Admin {
 				<?php if (empty($logs)): ?><tr><td colspan="9"><?php esc_html_e('No logs found.','reviewboost-pro'); ?></td></tr><?php else: ?>
 				<?php foreach($logs as $log): ?>
 				<tr class="rbp-log-row" data-log='<?php echo esc_attr(json_encode($log)); ?>' style="cursor:pointer;<?php if($log->status=='failed') echo 'background:#ffeaea;'; elseif($log->retry_count>0) echo 'background:#fffbe5;'; ?>">
-					<td><?php echo esc_html($log->timestamp); ?></td>
+					<td><?php echo esc_html($log->time_sent); ?></td>
 					<td><?php echo esc_html($log->order_id); ?></td>
 					<td><?php echo esc_html($log->customer_id); ?></td>
 					<td><?php echo esc_html($log->method); ?></td>
@@ -685,8 +685,8 @@ class RBP_Admin {
 		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
 		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
 		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
-		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
-		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $date_from ) { $where .= ' AND time_sent >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND time_sent <= %s'; $params[] = $date_to . ' 23:59:59'; }
 		if ( $q ) {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
@@ -699,9 +699,9 @@ class RBP_Admin {
 		}
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		$stats = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) as total, SUM(status='sent') as sent, SUM(status='failed') as failed, SUM(method='email') as email, SUM(method='whatsapp') as whatsapp, SUM(method='sms') as sms, SUM(method='coupon') as coupon FROM $table $where", ...$params ), ARRAY_A );
-		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(timestamp) FROM $table $where", ...$params ) );
+		$recent = $wpdb->get_var( $wpdb->prepare( "SELECT MAX(time_sent) FROM $table $where", ...$params ) );
 		$method_counts = $wpdb->get_results( $wpdb->prepare( "SELECT method, COUNT(*) as count FROM $table $where GROUP BY method", ...$params ), ARRAY_A );
 		$status_counts = $wpdb->get_results( $wpdb->get_prepare( "SELECT status, COUNT(*) as count FROM $table $where GROUP BY status", ...$params ), ARRAY_A );
 		$methods = $wpdb->get_col( "SELECT DISTINCT method FROM $table ORDER BY method" );
@@ -742,8 +742,8 @@ class RBP_Admin {
 		if ( $status ) { $where .= ' AND status = %s'; $params[] = $status; }
 		if ( $order_id ) { $where .= ' AND order_id = %d'; $params[] = $order_id; }
 		if ( $customer_id ) { $where .= ' AND customer_id = %d'; $params[] = $customer_id; }
-		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
-		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $date_from ) { $where .= ' AND time_sent >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND time_sent <= %s'; $params[] = $date_to . ' 23:59:59'; }
 		if ( $q ) {
 			$where .= ' AND (CAST(order_id AS CHAR) LIKE %s OR CAST(customer_id AS CHAR) LIKE %s OR details LIKE %s)';
 			$params[] = '%' . $q . '%'; $params[] = '%' . $q . '%'; $params[] = '%' . $q . '%';
@@ -754,7 +754,7 @@ class RBP_Admin {
 			$where .= ' AND order_id IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key="_rbp_gdpr_consent" AND meta_value=%s)';
 			$params[] = $consent;
 		}
-		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY timestamp DESC", ...$params ), ARRAY_A );
+		$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table $where ORDER BY time_sent DESC", ...$params ), ARRAY_A );
 		if ( empty( $logs ) ) {
 			wp_send_json_error(['message'=>__('No logs found for export.','reviewboost-pro')]);
 		}
@@ -885,8 +885,8 @@ class RBP_Admin {
 		$params = [];
 		if ( $event ) { $where .= ' AND status = %s'; $params[] = $event; }
 		if ( $customer ) { $where .= ' AND customer_id = %s'; $params[] = $customer; }
-		if ( $date_from ) { $where .= ' AND timestamp >= %s'; $params[] = $date_from . ' 00:00:00'; }
-		if ( $date_to ) { $where .= ' AND timestamp <= %s'; $params[] = $date_to . ' 23:59:59'; }
+		if ( $date_from ) { $where .= ' AND time_sent >= %s'; $params[] = $date_from . ' 00:00:00'; }
+		if ( $date_to ) { $where .= ' AND time_sent <= %s'; $params[] = $date_to . ' 23:59:59'; }
 		// Coupon code filter (in details JSON)
 		if ( $coupon_code ) {
 			$where .= " AND details LIKE %s";
@@ -902,11 +902,11 @@ class RBP_Admin {
 		// Query logs
 		$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $table $where", ...$params ) );
 		$offset = ( $page - 1 ) * $per_page;
-		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY timestamp DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
+		$logs = $wpdb->get_results( $wpdb->prepare( "$where ORDER BY time_sent DESC LIMIT %d OFFSET %d", ...array_merge($params, [$per_page, $offset]) ) );
 		// CSV export
 		if ( isset($_GET['export_coupon_csv']) && check_admin_referer('rbp_export_coupon_logs') ) {
 			$all_logs = $wpdb->get_results( $wpdb->prepare(
-				"SELECT * FROM $table $where ORDER BY timestamp DESC",
+				"SELECT * FROM $table $where ORDER BY time_sent DESC",
 				...$params
 			) );
 			headers_sent() || header('Content-Type: text/csv');
@@ -917,7 +917,7 @@ class RBP_Admin {
 				$details = is_array($log->details) ? $log->details : json_decode($log->details, true);
 				$coupon_code = is_array($details) && isset($details['coupon_code']) ? $details['coupon_code'] : '';
 				$review_id = is_array($details) && isset($details['review_id']) ? $details['review_id'] : '';
-				fputcsv($out, [ $log->timestamp, $log->customer_id, $log->status, $coupon_code, $review_id, $this->get_coupon_status($log), $log->details ]);
+				fputcsv($out, [ $log->time_sent, $log->customer_id, $log->status, $coupon_code, $review_id, $this->get_coupon_status($log), $log->details ]);
 			}
 			fclose($out); exit;
 		}
@@ -978,7 +978,7 @@ class RBP_Admin {
 					if ($plain !== $status) continue;
 				}
 				echo '<tr>';
-				echo '<td>' . esc_html($log->timestamp) . '</td>';
+				echo '<td>' . esc_html($log->time_sent) . '</td>';
 				echo '<td>' . esc_html($log->customer_id) . '</td>';
 				echo '<td>' . esc_html(ucfirst($log->status)) . '</td>';
 				echo '<td>' . esc_html($coupon_code) . '</td>';
