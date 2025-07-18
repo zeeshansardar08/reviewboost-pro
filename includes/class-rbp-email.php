@@ -19,6 +19,13 @@ class RBP_Email {
 			$subject = str_replace( $tag, $value, $subject );
 			$template = str_replace( $tag, $value, $template );
 		}
+		// Per-product review links tag
+		if ( strpos( $template, '{product_review_links}' ) !== false ) {
+			if ( class_exists( 'RBP_Pro' ) ) {
+				$links_html = RBP_Pro::get_product_review_links_for_order( $order, 'html' );
+				$template = str_replace( '{product_review_links}', $links_html, $template );
+			}
+		}
 		
 		$headers = [ 'Content-Type: text/html; charset=UTF-8' ];
 		return wp_mail( $customer_email, $subject, $template, $headers );
