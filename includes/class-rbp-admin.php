@@ -12,6 +12,7 @@ class RBP_Admin {
 		add_action('admin_init', [ $this, 'maybe_redirect_to_getting_started' ]);
 		add_action('admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ]);
 		add_action('admin_menu', [ $this, 'add_coupon_logs_dashboard_menu' ]);
+		add_action('admin_menu', [ $this, 'add_upgrade_to_pro_page' ]); // New action hook
 	}
 
 	public function add_settings_page() {
@@ -35,7 +36,6 @@ class RBP_Admin {
 			[ $this, 'render_logs_dashboard' ]
 		);
 	}
-
 
 	public function register_settings() {
 		register_setting( 'rbp_settings', 'rbp_reminder_subject', [ 'sanitize_callback' => 'sanitize_text_field' ] );
@@ -846,7 +846,7 @@ class RBP_Admin {
 				<li><strong><?php esc_html_e('Customize Reminder Templates:','reviewboost-pro'); ?></strong> <?php esc_html_e('Use the Advanced Template Builder to personalize your email, WhatsApp, and SMS messages.', 'reviewboost-pro'); ?></li>
 				<li><strong><?php esc_html_e('Enable Multi-step Automations:','reviewboost-pro'); ?></strong> <?php esc_html_e('Set up multi-step reminders for maximum engagement.', 'reviewboost-pro'); ?></li>
 				<li><strong><?php esc_html_e('Track Results:','reviewboost-pro'); ?></strong> <?php esc_html_e('View all reminder logs and analytics in the Pro Dashboard.', 'reviewboost-pro'); ?></li>
-				<li><strong><?php esc_html_e('Need Help?','reviewboost-pro'); ?></strong> <a href="https://your-support-url.com" target="_blank"><?php esc_html_e('Get Support','reviewboost-pro'); ?></a> | <a href="https://your-docs-url.com" target="_blank"><?php esc_html_e('Read Docs','reviewboost-pro'); ?></a></li>
+				<li><strong><?php esc_html_e('Need Help?','reviewboost-pro'); ?></strong> <a href="mailto:support@yourdomain.com" style="color:#7f54b3;text-decoration:underline;"><?php esc_html_e('Contact Support','reviewboost-pro'); ?></a> | <a href="https://your-docs-url.com" target="_blank"><?php esc_html_e('Read Docs','reviewboost-pro'); ?></a></li>
 			</ol>
 			<div style="margin-top:32px;">
 				<a href="https://your-upgrade-page.com" class="button button-primary button-hero" style="font-size:18px;"><?php esc_html_e('Upgrade to Pro','reviewboost-pro'); ?></a>
@@ -1026,6 +1026,82 @@ class RBP_Admin {
 		echo '</div>';
 	}
 
+	/**
+	 * Add Upgrade to Pro submenu page
+	 */
+	public function add_upgrade_to_pro_page() {
+		add_submenu_page(
+			'reviewboost-pro',
+			__('Upgrade to Pro','reviewboost-pro'),
+			__('Upgrade to Pro','reviewboost-pro'),
+			'manage_options',
+			'rbp-upgrade-to-pro',
+			[ $this, 'render_upgrade_to_pro_page' ]
+		);
+	}
+
+	/**
+	 * Render the Upgrade to Pro page
+	 */
+	public function render_upgrade_to_pro_page() {
+		$upgrade_url = 'https://your-upgrade-page.com'; // TODO: Replace with your real upgrade/pricing page
+		$plugin_logo = plugins_url( '../assets/img/reviewboost-logo.png', __FILE__ );
+		?>
+		<div class="wrap rbp-upgrade-to-pro" style="max-width:900px;margin-top:30px;">
+			<div style="background:#fff;border-radius:18px;box-shadow:0 8px 32px rgba(127,84,179,0.18);padding:40px 48px 36px 48px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden;">
+				<img src="<?php echo esc_url($plugin_logo); ?>" alt="ReviewBoost Pro" style="width:80px;height:80px;margin-bottom:20px;border-radius:50%;box-shadow:0 2px 8px rgba(127,84,179,0.10);background:#faf7fd;">
+				<h1 style="color:#7f54b3;font-size:2.4em;margin-bottom:16px;font-weight:800;letter-spacing:-1px;"><?php esc_html_e('Upgrade to ReviewBoost Pro','reviewboost-pro'); ?></h1>
+				<p style="font-size:1.25em;margin-bottom:30px;color:#444;max-width:600px;">
+					<?php esc_html_e('Unlock advanced automation, reminders, analytics, and priority support to skyrocket your reviews and customer trust.','reviewboost-pro'); ?>
+				</p>
+				<div style="width:100%;background:#faf7fd;border-radius:12px;padding:22px 10px 16px 10px;margin-bottom:32px;">
+					<table style="width:100%;font-size:1.09em;border-collapse:separate;border-spacing:0 8px;">
+						<thead><tr style="color:#7f54b3;font-weight:700;"><th style="text-align:left;padding:10px 0;"><?php esc_html_e('Feature','reviewboost-pro'); ?></th><th style="padding:10px 0;"><?php esc_html_e('Free','reviewboost-pro'); ?></th><th style="padding:10px 0;"><?php esc_html_e('Pro','reviewboost-pro'); ?></th></tr></thead>
+						<tbody>
+							<tr><td style="text-align:left;">🟢 <?php esc_html_e('WhatsApp Reminders','reviewboost-pro'); ?></td><td>❌</td><td style="color:#3bbf7a;font-weight:bold;">✔️</td></tr>
+							<tr><td style="text-align:left;">🟢 <?php esc_html_e('SMS Reminders','reviewboost-pro'); ?></td><td>❌</td><td style="color:#3bbf7a;font-weight:bold;">✔️</td></tr>
+							<tr><td style="text-align:left;">📈 <?php esc_html_e('Advanced Logs & Analytics','reviewboost-pro'); ?></td><td>❌</td><td style="color:#3bbf7a;font-weight:bold;">✔️</td></tr>
+							<tr><td style="text-align:left;">⚡ <?php esc_html_e('Priority Support','reviewboost-pro'); ?></td><td>❌</td><td style="color:#3bbf7a;font-weight:bold;">✔️</td></tr>
+							<tr><td style="text-align:left;">✉️ <?php esc_html_e('Basic Email Reminders','reviewboost-pro'); ?></td><td style="color:#3bbf7a;font-weight:bold;">✔️</td><td style="color:#3bbf7a;font-weight:bold;">✔️</td></tr>
+						</tbody>
+					</table>
+				</div>
+				<div style="margin-bottom:22px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
+					<span style="background:#e6f7ec;color:#2e7d32;padding:8px 18px;border-radius:18px;font-size:1.09em;display:inline-block;"><?php esc_html_e('30-day Money-Back Guarantee','reviewboost-pro'); ?></span>
+					<span style="background:#f7e6f7;color:#7f54b3;padding:8px 18px;border-radius:18px;font-size:1.09em;display:inline-block;"><?php esc_html_e('Trusted by 1000+ stores','reviewboost-pro'); ?></span>
+					<span style="background:#e3f2fd;color:#1976d2;padding:8px 18px;border-radius:18px;font-size:1.09em;display:inline-block;"><?php esc_html_e('Instant Activation','reviewboost-pro'); ?></span>
+				</div>
+				<a href="<?php echo esc_url($upgrade_url); ?>" target="_blank" class="button button-primary" style="font-size:1.22em;padding:16px 48px;border-radius:12px;background:#7f54b3;border:none;box-shadow:0 2px 12px rgba(127,84,179,0.10);font-weight:700;transition:background 0.2s;"><?php esc_html_e('Upgrade Now','reviewboost-pro'); ?></a>
+				<div style="margin-top:24px;font-size:1.09em;color:#888;">
+					<?php esc_html_e('Questions?','reviewboost-pro'); ?> <a href="mailto:support@yourdomain.com" style="color:#7f54b3;text-decoration:underline;"><?php esc_html_e('Contact Support','reviewboost-pro'); ?></a>
+				</div>
+				<hr style="margin:38px 0 26px 0;border:0;border-top:1.5px solid #eee;width:100%;">
+				<h2 style="color:#7f54b3;font-size:1.6em;margin-bottom:10px;font-weight:700;"><?php esc_html_e('What our users say','reviewboost-pro'); ?></h2>
+				<div style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center;margin-bottom:32px;">
+					<div style="background:#fafafa;border-radius:10px;box-shadow:0 2px 8px rgba(127,84,179,0.06);padding:18px 22px;max-width:320px;">
+						<div style="font-size:1.1em;color:#222;font-style:italic;margin-bottom:8px;">"<?php esc_html_e('ReviewBoost Pro doubled our reviews in just 2 months! Highly recommend.','reviewboost-pro'); ?>"</div>
+						<div style="color:#7f54b3;font-weight:600;">- <?php esc_html_e('Samantha, Woo Store Owner','reviewboost-pro'); ?></div>
+					</div>
+					<div style="background:#fafafa;border-radius:10px;box-shadow:0 2px 8px rgba(127,84,179,0.06);padding:18px 22px;max-width:320px;">
+						<div style="font-size:1.1em;color:#222;font-style:italic;margin-bottom:8px;">"<?php esc_html_e('The WhatsApp reminders are a game changer for our business.','reviewboost-pro'); ?>"</div>
+						<div style="color:#7f54b3;font-weight:600;">- <?php esc_html_e('James, eCommerce Manager','reviewboost-pro'); ?></div>
+					</div>
+					<div style="background:#fafafa;border-radius:10px;box-shadow:0 2px 8px rgba(127,84,179,0.06);padding:18px 22px;max-width:320px;">
+						<div style="font-size:1.1em;color:#222;font-style:italic;margin-bottom:8px;">"<?php esc_html_e('Easy to use and support is fantastic!','reviewboost-pro'); ?>"</div>
+						<div style="color:#7f54b3;font-weight:600;">- <?php esc_html_e('Priya, Small Business Owner','reviewboost-pro'); ?></div>
+					</div>
+				</div>
+				<hr style="margin:32px 0 26px 0;border:0;border-top:1.5px solid #eee;width:100%;">
+				<h2 style="color:#7f54b3;font-size:1.4em;margin-bottom:10px;font-weight:700;"><?php esc_html_e('Frequently Asked Questions','reviewboost-pro'); ?></h2>
+				<div style="text-align:left;max-width:680px;margin:0 auto;">
+					<details style="margin-bottom:14px;"><summary style="font-weight:600;color:#7f54b3;font-size:1.08em;cursor:pointer;"><?php esc_html_e('Is there a money-back guarantee?','reviewboost-pro'); ?></summary><div style="margin-top:6px;color:#222;font-size:1.08em;"><?php esc_html_e('Yes! You can try Pro risk-free for 30 days. If you’re not happy, get a full refund.','reviewboost-pro'); ?></div></details>
+					<details style="margin-bottom:14px;"><summary style="font-weight:600;color:#7f54b3;font-size:1.08em;cursor:pointer;"><?php esc_html_e('How fast do I get access after upgrading?','reviewboost-pro'); ?></summary><div style="margin-top:6px;color:#222;font-size:1.08em;"><?php esc_html_e('Instantly! As soon as you upgrade, all Pro features are unlocked.','reviewboost-pro'); ?></div></details>
+					<details style="margin-bottom:14px;"><summary style="font-weight:600;color:#7f54b3;font-size:1.08em;cursor:pointer;"><?php esc_html_e('Can I get help if I have questions?','reviewboost-pro'); ?></summary><div style="margin-top:6px;color:#222;font-size:1.08em;"><?php esc_html_e('Absolutely! Our support team is here to help you succeed.','reviewboost-pro'); ?></div></details>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
 }
 
 // Initialize admin
