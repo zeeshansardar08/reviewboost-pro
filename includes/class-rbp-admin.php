@@ -181,6 +181,26 @@ class RBP_Admin {
 						<td><textarea name="rbp_pro_sms_template" rows="4" cols="60"><?php echo esc_textarea( get_option( 'rbp_pro_sms_template', 'Hi [customer_name], please review your order [order_id]: [review_link]' ) ); ?></textarea> <?php esc_html_e( '(Pro)', 'reviewboost-pro' ); ?></td>
 					</tr>
 					<tr valign="top">
+    <th scope="row" colspan="2">
+        <strong><?php esc_html_e( 'Available Template Tags', 'reviewboost-pro' ); ?></strong>
+    </th>
+</tr>
+<tr valign="top">
+    <td colspan="2">
+        <div class="rbp-template-tags-help">
+            <p>
+                <strong>[customer_name]</strong> – <?php esc_html_e('Customer first name', 'reviewboost-pro'); ?><br>
+                <strong>[order_id]</strong> – <?php esc_html_e('Order ID', 'reviewboost-pro'); ?><br>
+                <strong>{product_review_links}</strong> – <?php esc_html_e('List of product-specific review links for this order. Outputs as a bulleted HTML list in emails, or plain text list in WhatsApp/SMS.', 'reviewboost-pro'); ?>
+            </p>
+            <p>
+                <em><?php esc_html_e('Example usage:', 'reviewboost-pro'); ?></em><br>
+                <code>Hi [customer_name],<br>Thank you for your purchase! Please review your products:<br>{product_review_links}</code>
+            </p>
+        </div>
+    </td>
+</tr>
+					<tr valign="top">
 						<th scope="row" colspan="2"><strong><?php esc_html_e( 'Multi-step Reminders (Pro)', 'reviewboost-pro' ); ?></strong></th>
 					</tr>
 					<tr valign="top">

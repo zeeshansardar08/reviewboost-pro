@@ -83,8 +83,14 @@ class RBP_Pro {
                     continue;
                 }
             }
-            $phone = $order->get_billing_phone();
-            if ( ! $phone ) continue;
+            $template = $reminder->template ?? '';
+            // Per-product review links tag
+            if ( strpos( $template, '{product_review_links}' ) !== false ) {
+                $links_text = self::get_product_review_links_for_order( $order, 'text' );
+                $template = str_replace( '{product_review_links}', $links_text, $template );
+            }
+            $phone = $reminder->recipient ?? '';
+            $message = $template;
             $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
             $review_link = get_permalink( wc_get_page_id( 'myaccount' ) ) . 'review/' . $order->get_id();
             $template = get_option('rbp_pro_whatsapp_template','Hi [customer_name], please review your order [order_id]: [review_link]');
@@ -131,6 +137,12 @@ class RBP_Pro {
                     RBP_Logger::log_event( $order->get_id(), $order->get_customer_id(), 'sms', current_time('mysql'), 'skipped_no_consent', 0 );
                     continue;
                 }
+            }
+            $template = $reminder->template ?? '';
+            // Per-product review links tag
+            if ( strpos( $template, '{product_review_links}' ) !== false ) {
+                $links_text = self::get_product_review_links_for_order( $order, 'text' );
+                $template = str_replace( '{product_review_links}', $links_text, $template );
             }
             $phone = $order->get_billing_phone();
             if ( ! $phone ) continue;
@@ -487,6 +499,40 @@ class RBP_Pro {
      */
     public function save_gdpr_consent_order_meta( $order_id ) {
         update_post_meta( $order_id, '_rbp_gdpr_consent', isset($_POST['rbp_gdpr_consent']) ? 'yes' : 'no' );
+    }
+
+        /**
+     * Generate per-product review links for an order.
+     * @param WC_Order $order
+     * @param string $format 'html' or 'text'
+     * @return string
+     */
+    public static function get_product_review_links_for_order( $order, $format = 'html' ) {
+        if ( ! $order || ! is_a( $order, 'WC_Order' ) ) return '';
+        $items = $order->get_items();
+        if ( empty( $items ) ) return '';
+        $links = [];
+        foreach ( $items as $item ) {
+            $product = $item->get_product();
+            if ( ! $product ) continue;
+            $name = $product->get_name();
+            $url = get_permalink( $product->get_id() );
+            if ( $url ) {
+                // WooCommerce reviews are usually at #reviews anchor
+                $review_url = $url . '#reviews';
+                if ( $format === 'html' ) {
+                    $links[] = sprintf( '<li><a href="%s">%s</a></li>', esc_url( $review_url ), esc_html( $name ) );
+                } else {
+                    $links[] = sprintf( '%s: %s', $name, $review_url );
+                }
+            }
+        }
+        if ( empty( $links ) ) return '';
+        if ( $format === 'html' ) {
+            return '<ul>' . implode( '', $links ) . '</ul>';
+        } else {
+            return implode( "\n", $links );
+        }
     }
 }
 
