@@ -456,14 +456,34 @@ class RBP_Pro {
     public function show_license_required_notice() {
         if ( ! current_user_can('manage_options') ) return;
         $upgrade_url = 'https://your-upgrade-page.com'; // TODO: Replace with your real upgrade/pricing page
-        echo '<div class="notice notice-warning rbp-pro-locked-notice" style="border-left:6px solid #7f54b3;padding:18px 12px 18px 18px;display:flex;align-items:center;">'
-            .'<span class="dashicons dashicons-lock" style="font-size:28px;color:#7f54b3;margin-right:18px;"></span>'
-            .'<div>'
-            .'<strong>'.esc_html__('ReviewBoost Pro features are locked.','reviewboost-pro').'</strong><br>'
-            .esc_html__('Activate your license to unlock all premium features, including WhatsApp/SMS reminders, advanced logs, and more!','reviewboost-pro')
-            .'<br><a href="'.esc_url($upgrade_url).'" target="_blank" class="button button-primary" style="margin-top:10px;">'.esc_html__('Learn More & Upgrade','reviewboost-pro').'</a>'
-            .'</div>'
-            .'</div>';
+        $plugin_logo = plugins_url( 'assets/img/reviewboost-logo.png', dirname(__FILE__) );
+        ?>
+        <div class="notice rbp-pro-locked-notice">
+            <div class="notice-content">
+                <img src="<?php echo esc_url($plugin_logo); ?>" alt="ReviewBoost Pro" class="rbp-plugin-logo">
+                <h2><?php esc_html_e('Unlock ReviewBoost Pro', 'reviewboost-pro'); ?></h2>
+                <p><?php esc_html_e('Get advanced WhatsApp & SMS reminders, analytics, and priority support.', 'reviewboost-pro'); ?></p>
+                <div class="rbp-feature-table">
+                    <table>
+                        <thead><tr><th><?php esc_html_e('Feature','reviewboost-pro'); ?></th><th><?php esc_html_e('Free','reviewboost-pro'); ?></th><th><?php esc_html_e('Pro','reviewboost-pro'); ?></th></tr></thead>
+                        <tbody>
+                            <tr><td>🟢 <?php esc_html_e('WhatsApp Reminders','reviewboost-pro'); ?></td><td><span class="rbp-feature-unavailable">❌</span></td><td><span class="rbp-feature-available">✔️</span></td></tr>
+                            <tr><td>🟢 <?php esc_html_e('SMS Reminders','reviewboost-pro'); ?></td><td><span class="rbp-feature-unavailable">❌</span></td><td><span class="rbp-feature-available">✔️</span></td></tr>
+                            <tr><td>📈 <?php esc_html_e('Advanced Analytics','reviewboost-pro'); ?></td><td><span class="rbp-feature-unavailable">❌</span></td><td><span class="rbp-feature-available">✔️</span></td></tr>
+                            <tr><td>⚡ <?php esc_html_e('Priority Support','reviewboost-pro'); ?></td><td><span class="rbp-feature-unavailable">❌</span></td><td><span class="rbp-feature-available">✔️</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="rbp-trust-badges">
+                    <span class="rbp-trust-badge success"><?php esc_html_e('30-day Money-Back Guarantee','reviewboost-pro'); ?></span>
+                    <span class="rbp-trust-badge primary"><?php esc_html_e('Trusted by 1000+ stores','reviewboost-pro'); ?></span>
+                    <span class="rbp-trust-badge info"><?php esc_html_e('Instant Activation','reviewboost-pro'); ?></span>
+                </div>
+                <a href="<?php echo esc_url($upgrade_url); ?>" class="button button-primary rbp-btn rbp-btn-primary"><?php esc_html_e('Upgrade Now','reviewboost-pro'); ?></a>
+                <p style="margin-top:16px;"><a href="mailto:support@yourdomain.com"><?php esc_html_e('Contact Support','reviewboost-pro'); ?></a></p>
+            </div>
+        </div>
+        <?php
     }
 
     /**
