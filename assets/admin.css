@@ -632,3 +632,120 @@
         border: 2px solid #000;
     }
 }
+
+/* Filter Forms */
+.rbp-filter-form {
+    background: #fff;
+    border-radius: var(--rbp-radius);
+    padding: 24px;
+    box-shadow: var(--rbp-shadow);
+    border: 1px solid var(--rbp-border);
+}
+
+.rbp-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.rbp-filter-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.rbp-filter-item label {
+    font-weight: 600;
+    color: var(--rbp-primary);
+    margin-bottom: 8px;
+    font-size: 0.95em;
+}
+
+.rbp-input,
+.rbp-select {
+    border: 2px solid var(--rbp-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 1em;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    background: #fff;
+    color: var(--rbp-text);
+}
+
+.rbp-input:focus,
+.rbp-select:focus {
+    border-color: var(--rbp-primary);
+    box-shadow: 0 0 0 3px rgba(127, 84, 179, 0.1);
+    outline: none;
+}
+
+.rbp-filter-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
+/* Pagination */
+.rbp-pagination {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 2px solid var(--rbp-border);
+    text-align: center;
+}
+
+.rbp-pagination .tablenav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.rbp-pagination .pagination-links {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.rbp-pagination .pagination-links a,
+.rbp-pagination .pagination-links .tablenav-pages-navspan {
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.rbp-pagination .pagination-links a {
+    background: #fff;
+    color: var(--rbp-primary);
+    border: 2px solid var(--rbp-border);
+}
+
+.rbp-pagination .pagination-links a:hover {
+    background: var(--rbp-primary);
+    color: #fff;
+    border-color: var(--rbp-primary);
+}
+
+.rbp-pagination .pagination-links .tablenav-pages-navspan {
+    background: var(--rbp-primary);
+    color: #fff;
+    border: 2px solid var(--rbp-primary);
+}
+
+/* Responsive Filter Forms */
+@media (max-width: 768px) {
+    .rbp-filter-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .rbp-filter-actions {
+        justify-content: center;
+    }
+    
+    .rbp-pagination .pagination-links {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
