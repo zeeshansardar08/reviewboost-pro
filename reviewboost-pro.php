@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: ReviewBoost Pro
- * Plugin URI: https://reviewboostpro.com/
- * Description: Boost your WooCommerce reviews by sending automated reminders via Email, WhatsApp, and SMS after order completion. Modular, secure, and fully translatable.
+ * Plugin URI: https://zignites.com/plugins/reviewboost-pro
+ * Description: Boost your WooCommerce reviews by sending automated reminders via Email after order completion. Modular, secure, and fully translatable.
  * Version: 1.0.0
  * Author: Muhammad Zeeshan Sardar
- * Author URI: https://reviewboostpro.com/
+ * Author URI: https://zignites.com
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: reviewboost-pro
@@ -17,68 +17,25 @@
  * WC tested up to: 8.9
  */
 
-// Load Freemius SDK and initialize before anything else
-// require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-freemius.php';
+// Prevent direct file access
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'rbp_fs' ) ) {
-    // Create a helper function for easy SDK access.
-    function rbp_fs() {
-        global $rbp_fs;
+// Load core plugin files (only free features)
+require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-core.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-admin.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-cron.php';
 
-        if ( ! isset( $rbp_fs ) ) {
-            // Include Freemius SDK.
-            require_once dirname( __FILE__ ) . '/freemius/start.php';
-            $rbp_fs = fs_dynamic_init( array(
-                'id'                  => '19869',
-                'slug'                => 'review-booster-pro',
-                'type'                => 'plugin',
-                'public_key'          => 'pk_8e10271b6efd64ed441eb0063aad2',
-                'is_premium'          => false,
-                'has_addons'          => false,
-                'has_paid_plans'      => false,
-                'menu'                => array(
-                    'account'        => false,
-                    'support'        => false,
-                ),
-            ) );
-        }
-
-        return $rbp_fs;
+// Initialize the plugin
+add_action( 'plugins_loaded', 'rbp_init_plugin' );
+function rbp_init_plugin() {
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        add_action( 'admin_notices', function() {
+            echo '<div class="notice notice-error"><p>' . esc_html__( 'ReviewBoost Pro requires WooCommerce to be installed and active.', 'reviewboost-pro' ) . '</p></div>';
+        });
+        return;
     }
-
-    // Init Freemius.
-    rbp_fs();
-    // Signal that SDK was initiated.
-    do_action( 'rbp_fs_loaded' );
-}
-
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly.
-}
-
-// Define plugin constants
-define( 'RBP_VERSION', '1.0.0' );
-define( 'RBP_PLUGIN_FILE', __FILE__ );
-define( 'RBP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
-define( 'RBP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'RBP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'RBP_TEXT_DOMAIN', 'reviewboost-pro' );
-
-// Load text domain for translations
-add_action( 'plugins_loaded', function() {
-	load_plugin_textdomain( RBP_TEXT_DOMAIN, false, dirname( RBP_PLUGIN_BASENAME ) . '/languages/' );
-} );
-
-// Autoload core classes
-require_once RBP_PLUGIN_DIR . 'includes/class-rbp-core.php';
-if ( is_admin() ) {
-	require_once RBP_PLUGIN_DIR . 'includes/class-rbp-admin.php';
-}
-require_once RBP_PLUGIN_DIR . 'includes/class-rbp-logger.php';
-require_once RBP_PLUGIN_DIR . 'includes/class-rbp-email.php';
-require_once RBP_PLUGIN_DIR . 'includes/class-rbp-cron.php';
-
-// Pro features loader (only if Pro add-on detected)
-if ( file_exists( RBP_PLUGIN_DIR . 'includes/class-rbp-pro.php' ) ) {
-	require_once RBP_PLUGIN_DIR . 'includes/class-rbp-pro.php';
+    // Initialize core plugin functionality
+    if ( class_exists( 'RBP_Core' ) ) {
+        RBP_Core::instance();
+    }
 }
