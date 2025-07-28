@@ -44,14 +44,7 @@ class RBP_Core {
 		];
 		$orders = get_posts( $args );
 		foreach ( $orders as $order_id ) {
-			// GDPR consent check
-			if ( get_option('rbp_pro_gdpr_consent_enabled', 1) ) {
-				$consent = get_post_meta( $order_id, '_rbp_gdpr_consent', true );
-				if ( $consent !== 'yes' ) {
-					RBP_Logger::log_event( $order_id, get_post_meta( $order_id, '_customer_user', true ), 'email', current_time( 'mysql' ), 'skipped_no_consent', 0 );
-					continue;
-				}
-			}
+			// Removed GDPR consent check for MVP free version
 			RBP_Email::send_reminder( $order_id );
 			update_post_meta( $order_id, '_rbp_reminder_sent', 1 );
 			RBP_Logger::log_event( $order_id, get_post_meta( $order_id, '_customer_user', true ), 'email', current_time( 'mysql' ), 'sent', 0 );

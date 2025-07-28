@@ -21,10 +21,8 @@ class RBP_Email {
 		}
 		// Per-product review links tag
 		if ( strpos( $template, '{product_review_links}' ) !== false ) {
-			if ( class_exists( 'RBP_Pro' ) ) {
-				$links_html = RBP_Pro::get_product_review_links_for_order( $order, 'html' );
-				$template = str_replace( '{product_review_links}', $links_html, $template );
-			}
+			// Remove Pro-only logic; just remove tag for free version
+			$template = str_replace( '{product_review_links}', '', $template );
 		}
 		
 		$headers = [ 'Content-Type: text/html; charset=UTF-8' ];
