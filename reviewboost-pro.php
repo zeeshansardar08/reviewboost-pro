@@ -25,6 +25,9 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-core.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-admin.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-rbp-cron.php';
 
+// Register deactivation hook to clear scheduled events
+register_deactivation_hook( __FILE__, [ 'RBP_Cron', 'clear_schedules' ] );
+
 // Initialize the plugin
 add_action( 'plugins_loaded', 'rbp_init_plugin' );
 function rbp_init_plugin() {
@@ -36,6 +39,6 @@ function rbp_init_plugin() {
     }
     // Initialize core plugin functionality
     if ( class_exists( 'RBP_Core' ) ) {
-        RBP_Core::instance();
+        $GLOBALS['rbp_core'] = new RBP_Core();
     }
 }

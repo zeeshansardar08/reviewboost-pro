@@ -10,4 +10,4 @@ class RBP_Cron {
 	}
 }
 
-register_deactivation_hook( RBP_PLUGIN_FILE, [ 'RBP_Cron', 'clear_schedules' ] );
+// Deactivation hook now registered in main plugin file for WordPress.org compliance
